@@ -5,7 +5,7 @@ Fine Marble
 - Will (Chi Kien Phung) – Initial setup, networking, gameplay systems
 - Nathan Meza – Implementation, Game Design, VFX
 - Skyler Varney – Art, 3D Modeling
-- [Member 4 name] – [role]
+- Jingyi Chen – UI / Sound / Polish
 - [Member 5 name] – [role]
 
 ## Game Description
