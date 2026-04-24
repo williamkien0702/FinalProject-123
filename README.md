@@ -4,7 +4,7 @@ Fine Marble
 ## Members / Roles
 - Will (Chi Kien Phung) – Initial setup, networking, gameplay systems
 - Nathan Meza – Implementation, Game Design, VFX
-- [Member 3 name] – [role]
+- Skyler Varney – Art, 3D Modeling
 - [Member 4 name] – [role]
 - [Member 5 name] – [role]
 
