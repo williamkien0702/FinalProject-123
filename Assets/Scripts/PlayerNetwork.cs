@@ -2,40 +2,56 @@ using Unity.Netcode;
 using UnityEngine;
 
 public class PlayerNetwork : NetworkBehaviour
-{   
-    //networkVariable used to sync each player's score across the network
+{
     public NetworkVariable<int> score = new NetworkVariable<int>(0);
 
-    [SerializeField] AudioSource sfxSource;
+    [SerializeField] private AudioSource sfxSource;
 
-
-    void Awake()
+    private void Awake()
     {
-        if (sfxSource == null) sfxSource = GetComponent<AudioSource>();
+        if (sfxSource == null)
+        {
+            sfxSource = GetComponent<AudioSource>();
+        }
     }
-
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!IsServer) return;
-        if (!other.CompareTag("Coin")) return;
+        if (GameManager.gameOver || !other.CompareTag("Coin"))
+        {
+            return;
+        }
 
-        var coinNetObj = other.GetComponent<NetworkObject>();
+        if (IsOwner)
+        {
+            PlayCoinSfxLocal();
+        }
+
+        if (!IsServer)
+        {
+            return;
+        }
+
+        NetworkObject coinNetObj = other.GetComponent<NetworkObject>();
         if (coinNetObj != null && coinNetObj.IsSpawned)
         {
             score.Value += 1;
 
-            PlayCoinSfxClientRpc();
+            GameManager gameManager = Object.FindFirstObjectByType<GameManager>();
+            if (gameManager != null)
+            {
+                gameManager.CoinCollected();
+            }
 
-            Object.FindFirstObjectByType<GameManager>().CoinCollected();
-            
             coinNetObj.Despawn(true);
         }
     }
-    //play the coin collect sound
-    [ClientRpc]
-    void PlayCoinSfxClientRpc()
+
+    private void PlayCoinSfxLocal()
     {
-        if (sfxSource != null) sfxSource.Play();
+        if (sfxSource != null)
+        {
+            sfxSource.Play();
+        }
     }
 }
