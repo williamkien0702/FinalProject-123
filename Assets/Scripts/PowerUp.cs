@@ -10,17 +10,21 @@ public class PowerUp : NetworkBehaviour
     }
 
     public PowerUpType powerUpType;
-
     public float boostedSpeed = 35f;
     public float duration = 5f;
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!IsServer) return;
+        if (!IsServer)
+        {
+            return;
+        }
 
         PlayerMovement player = other.GetComponent<PlayerMovement>();
-
-        if (player == null) return;
+        if (player == null)
+        {
+            return;
+        }
 
         if (powerUpType == PowerUpType.SpeedBoost)
         {
@@ -32,7 +36,6 @@ public class PowerUp : NetworkBehaviour
         }
 
         NetworkObject netObj = GetComponent<NetworkObject>();
-
         if (netObj != null && netObj.IsSpawned)
         {
             netObj.Despawn(true);

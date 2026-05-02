@@ -6,135 +6,179 @@ using System.Collections.Generic;
 public class LaserGridManager : NetworkBehaviour
 {
     public GameObject laserLinePrefab;
-
     public float eventInterval = 10f;
     public float warningDuration = 2f;
-    public float laserDuration = 2f;
-
-    public float arenaMinX = -50f;
-    public float arenaMaxX = 50f;
-    public float arenaMinZ = -50f;
-    public float arenaMaxZ = 50f;
-
-    public float gridSpacing = 20f;
+    public float laserDuration = 1f;
+    public int pointPenalty = 5;
+    public float arenaMinX = -30f;
+    public float arenaMaxX = 30f;
+    public float arenaMinZ = -30f;
+    public float arenaMaxZ = 30f;
+    public float gridSpacing = 10f;
     public float laserLineWidth = 0.8f;
-    public float laserHeight = 1.2f;
-    public float laserThickness = 0.4f;
 
     public static bool laserWarningActive = false;
     public static bool laserFiringActive = false;
 
-    private List<LaserLine> activeLaserLines = new List<LaserLine>();
+    private readonly List<GameObject> _activeLaserLines = new List<GameObject>();
 
     public override void OnNetworkSpawn()
     {
-        if (!IsServer) return;
-        StartCoroutine(LaserLoop());
+        if (IsServer)
+        {
+            StartCoroutine(LaserLoop());
+        }
     }
 
-    IEnumerator LaserLoop()
+    private IEnumerator LaserLoop()
     {
         yield return new WaitForSeconds(5f);
-
         while (true)
         {
             if (!GameManager.gameOver)
+            {
                 yield return StartCoroutine(RunLaserGridEvent());
+            }
 
             yield return new WaitForSeconds(eventInterval);
         }
     }
 
-    IEnumerator RunLaserGridEvent()
+    private IEnumerator RunLaserGridEvent()
     {
-        // Warning phase — lasers are visible but canDamage is false
         laserWarningActive = true;
         laserFiringActive = false;
         UpdateLaserStatusClientRpc(true, false);
-
         SpawnLaserGrid();
-        SetLasersDamaging(false);
-
         yield return new WaitForSeconds(warningDuration);
 
-        // Firing phase — enable damage on all laser colliders
         laserWarningActive = false;
         laserFiringActive = true;
         UpdateLaserStatusClientRpc(false, true);
-
-        SetLasersDamaging(true);
-
+        DamagePlayersOnGridLines();
         yield return new WaitForSeconds(laserDuration);
 
-        // Done — disable damage and despawn
         laserFiringActive = false;
         UpdateLaserStatusClientRpc(false, false);
-
-        SetLasersDamaging(false);
         ClearLaserGrid();
     }
 
-    void SpawnLaserGrid()
+    private void SpawnLaserGrid()
     {
-        // Vertical lines (extend along Z axis)
         for (float x = arenaMinX; x <= arenaMaxX; x += gridSpacing)
         {
-            Vector3 position = new Vector3(x, laserHeight, 0f);
-            Vector3 scale = new Vector3(laserLineWidth, laserThickness, arenaMaxZ - arenaMinZ);
+            Vector3 position = new Vector3(x, 0.25f, 0f);
+            Vector3 scale = new Vector3(laserLineWidth, 0.15f, arenaMaxZ - arenaMinZ);
             SpawnLaserLine(position, scale);
         }
 
-        // Horizontal lines (extend along X axis)
         for (float z = arenaMinZ; z <= arenaMaxZ; z += gridSpacing)
         {
-            Vector3 position = new Vector3(0f, laserHeight, z);
-            Vector3 scale = new Vector3(arenaMaxX - arenaMinX, laserThickness, laserLineWidth);
+            Vector3 position = new Vector3(0f, 0.25f, z);
+            Vector3 scale = new Vector3(arenaMaxX - arenaMinX, 0.15f, laserLineWidth);
             SpawnLaserLine(position, scale);
         }
     }
 
-    void SpawnLaserLine(Vector3 position, Vector3 scale)
+    private void SpawnLaserLine(Vector3 position, Vector3 scale)
     {
-        if (laserLinePrefab == null) return;
+        if (laserLinePrefab == null)
+        {
+            return;
+        }
 
         GameObject line = Instantiate(laserLinePrefab, position, Quaternion.identity);
         line.transform.localScale = scale;
 
         NetworkObject netObj = line.GetComponent<NetworkObject>();
-        if (netObj != null) netObj.Spawn();
+        if (netObj != null)
+        {
+            netObj.Spawn();
+        }
 
-        LaserLine laserLine = line.GetComponent<LaserLine>();
-        if (laserLine != null)
-            activeLaserLines.Add(laserLine);
+        _activeLaserLines.Add(line);
     }
 
-    void SetLasersDamaging(bool damaging)
+    private void DamagePlayersOnGridLines()
     {
-        foreach (LaserLine line in activeLaserLines)
+        PlayerNetwork[] players = FindObjectsByType<PlayerNetwork>(FindObjectsSortMode.None);
+        for (int i = 0; i < players.Length; i++)
         {
-            if (line != null)
-                line.canDamage = damaging;
+            PlayerNetwork playerNetwork = players[i];
+            if (playerNetwork == null || !playerNetwork.IsSpawned)
+            {
+                continue;
+            }
+
+            Vector3 playerPos = playerNetwork.transform.position;
+            if (!IsOnGridLine(playerPos))
+            {
+                continue;
+            }
+
+            playerNetwork.score.Value = Mathf.Max(0, playerNetwork.score.Value - pointPenalty);
+            PlayerMovement movement = playerNetwork.GetComponent<PlayerMovement>();
+            if (movement != null)
+            {
+                movement.NotifyLaserDamage(pointPenalty);
+            }
         }
     }
 
-    void ClearLaserGrid()
+    private bool IsOnGridLine(Vector3 playerPos)
     {
-        foreach (LaserLine line in activeLaserLines)
+        for (float x = arenaMinX; x <= arenaMaxX; x += gridSpacing)
         {
-            if (line == null) continue;
+            if (Mathf.Abs(playerPos.x - x) <= laserLineWidth)
+            {
+                return true;
+            }
+        }
+
+        for (float z = arenaMinZ; z <= arenaMaxZ; z += gridSpacing)
+        {
+            if (Mathf.Abs(playerPos.z - z) <= laserLineWidth)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ClearLaserGrid()
+    {
+        for (int i = 0; i < _activeLaserLines.Count; i++)
+        {
+            GameObject line = _activeLaserLines[i];
+            if (line == null)
+            {
+                continue;
+            }
 
             NetworkObject netObj = line.GetComponent<NetworkObject>();
             if (netObj != null && netObj.IsSpawned)
+            {
                 netObj.Despawn(true);
+            }
         }
 
-        activeLaserLines.Clear();
+        _activeLaserLines.Clear();
     }
 
     [ClientRpc]
-    void UpdateLaserStatusClientRpc(bool warning, bool firing)
+    private void UpdateLaserStatusClientRpc(bool warning, bool firing)
     {
         laserWarningActive = warning;
         laserFiringActive = firing;
+
+        if (warning)
+        {
+            UiEventFeed.Push("LASER WARNING", new Color(1f, 0.85f, 0.2f), 1.1f);
+        }
+        else if (firing)
+        {
+            UiEventFeed.Push("LASER FIRING", new Color(1f, 0.35f, 0.35f), 0.9f);
+        }
     }
 }

@@ -5,36 +5,49 @@ public class PlayerNetwork : NetworkBehaviour
 {
     public NetworkVariable<int> score = new NetworkVariable<int>(0);
 
-    [SerializeField] AudioSource sfxSource;
+    [SerializeField] private AudioSource sfxSource;
 
-    void Awake()
+    private void Awake()
     {
-        if (sfxSource == null) sfxSource = GetComponent<AudioSource>();
+        if (sfxSource == null)
+        {
+            sfxSource = GetComponent<AudioSource>();
+        }
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!other.CompareTag("Coin")) return;
+        if (!other.CompareTag("Coin"))
+        {
+            return;
+        }
 
         if (IsOwner)
         {
             PlayCoinSfxLocal();
         }
 
-        if (!IsServer) return;
+        if (!IsServer)
+        {
+            return;
+        }
 
-        var coinNetObj = other.GetComponent<NetworkObject>();
+        NetworkObject coinNetObj = other.GetComponent<NetworkObject>();
         if (coinNetObj != null && coinNetObj.IsSpawned)
         {
             score.Value += 1;
 
-            Object.FindFirstObjectByType<GameManager>().CoinCollected();
+            GameManager gm = Object.FindFirstObjectByType<GameManager>();
+            if (gm != null)
+            {
+                gm.CoinCollected();
+            }
 
             coinNetObj.Despawn(true);
         }
     }
 
-    void PlayCoinSfxLocal()
+    private void PlayCoinSfxLocal()
     {
         if (sfxSource != null)
         {

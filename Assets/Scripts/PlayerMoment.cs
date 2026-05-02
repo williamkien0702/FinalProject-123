@@ -1,33 +1,42 @@
 using UnityEngine;
 using Unity.Netcode;
-using System.Collections;
+using System.Collections.Generic;
 
 public class PlayerMovement : NetworkBehaviour
 {
-    public float baseSpeed = 8f;            // Reduced from 20 — FPS games move slower
-    public float dashForce = 6f;
+    public float baseSpeed = 20f;
+    public float dashForce = 12f;
     public float dashCooldown = 3f;
 
-    private float currentSpeed;
-    private bool canDash = true;
-    private bool hasShield = false;
+    private float _slowSpeed = 6f;
+    private float _boostSpeed = 35f;
+    private float _dashCooldownRemaining;
+    private Vector2 _moveInput = Vector2.zero;
+    private Vector3 _lastMoveDirection = Vector3.forward;
 
-    // Replicated from owner to server each tick
-    private Vector2 moveInput = Vector2.zero;
-    private float currentYaw = 0f;         // Horizontal facing angle in degrees
+    private readonly NetworkVariable<float> _speedBoostRemaining = new NetworkVariable<float>(0f);
+    private readonly NetworkVariable<float> _shieldRemaining = new NetworkVariable<float>(0f);
+    private readonly NetworkVariable<float> _slowRemaining = new NetworkVariable<float>(0f);
 
-    void Awake()
+    private static readonly Dictionary<ulong, string> _cachedPlayerLabels = new Dictionary<ulong, string>();
+
+    public override void OnNetworkSpawn()
     {
-        currentSpeed = baseSpeed;
+        if (IsOwner)
+        {
+            CacheLocalPlayerLabel();
+        }
     }
 
-    void Update()
+    private void Update()
     {
-        if (!IsOwner) return;
-        if (GameManager.gameOver)
+        if (IsServer)
         {
-            // Unlock cursor on game over so UI buttons are clickable
-            TopDownFollowOwner.UnlockCursor();
+            TickStatusTimers(Time.deltaTime);
+        }
+
+        if (!IsOwner || GameManager.gameOver)
+        {
             return;
         }
 
@@ -41,122 +50,276 @@ public class PlayerMovement : NetworkBehaviour
 
         SubmitInputServerRpc(h, v);
 
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (_dashCooldownRemaining > 0f)
         {
+            _dashCooldownRemaining -= Time.deltaTime;
+        }
+
+        if (Input.GetKeyDown(KeyCode.Space) && _dashCooldownRemaining <= 0f)
+        {
+            _dashCooldownRemaining = dashCooldown;
             DashServerRpc();
+            UiEventFeed.Push("DASH", new Color(0.78f, 0.96f, 1f), 0.7f);
         }
     }
 
-    /// <summary>
-    /// Called by FollowOwner on the local client every LateUpdate with the
-    /// current mouse-look yaw so the server can rotate the player body.
-    /// </summary>
-    public void SetYaw(float yaw)
+    private void FixedUpdate()
     {
-        SetYawServerRpc(yaw);
-    }
+        if (!IsServer || GameManager.gameOver)
+        {
+            return;
+        }
 
-    [ServerRpc]
-    void SetYawServerRpc(float yaw)
-    {
-        currentYaw = yaw;
-        // Rotate the visible player body to face the direction they are looking
-        transform.rotation = Quaternion.Euler(0f, currentYaw, 0f);
-    }
+        Vector3 move = new Vector3(_moveInput.x, 0f, _moveInput.y).normalized;
+        Vector3 nextPosition = transform.position + move * GetCurrentSpeed() * Time.fixedDeltaTime;
 
-    [ServerRpc]
-    void SubmitInputServerRpc(float h, float v)
-    {
-        moveInput = new Vector2(h, v);
-    }
-
-    void FixedUpdate()
-    {
-        if (!IsServer) return;
-        if (GameManager.gameOver) return;
-
-        // Move relative to the player's current facing direction (yaw)
-        Vector3 forward = new Vector3(
-            Mathf.Sin(currentYaw * Mathf.Deg2Rad), 0f,
-            Mathf.Cos(currentYaw * Mathf.Deg2Rad));
-        Vector3 right = new Vector3(forward.z, 0f, -forward.x);
-
-        Vector3 move = (forward * moveInput.y + right * moveInput.x).normalized;
-        Vector3 nextPosition = transform.position + move * currentSpeed * Time.fixedDeltaTime;
-
-        if (!Physics.CheckSphere(nextPosition, 0.4f, LayerMask.GetMask("Wall")))
+        if (!Physics.CheckSphere(nextPosition, 0.6f, LayerMask.GetMask("Wall")))
         {
             transform.position = nextPosition;
         }
     }
 
-    [ServerRpc]
-    void DashServerRpc()
+    private void TickStatusTimers(float deltaTime)
     {
-        if (!canDash) return;
+        if (_speedBoostRemaining.Value > 0f)
+        {
+            _speedBoostRemaining.Value = Mathf.Max(0f, _speedBoostRemaining.Value - deltaTime);
+        }
 
-        StartCoroutine(DashCooldownRoutine());
+        if (_shieldRemaining.Value > 0f)
+        {
+            _shieldRemaining.Value = Mathf.Max(0f, _shieldRemaining.Value - deltaTime);
+        }
 
-        // Dash in the direction the player is facing
-        Vector3 forward = new Vector3(
-            Mathf.Sin(currentYaw * Mathf.Deg2Rad), 0f,
-            Mathf.Cos(currentYaw * Mathf.Deg2Rad));
-
-        // Use move input to pick dash direction; fall back to forward
-        Vector3 right = new Vector3(forward.z, 0f, -forward.x);
-        Vector3 dashDir = (forward * moveInput.y + right * moveInput.x).normalized;
-        if (dashDir == Vector3.zero) dashDir = forward;
-
-        transform.position += dashDir * dashForce;
+        if (_slowRemaining.Value > 0f)
+        {
+            _slowRemaining.Value = Mathf.Max(0f, _slowRemaining.Value - deltaTime);
+        }
     }
 
-    IEnumerator DashCooldownRoutine()
+    private float GetCurrentSpeed()
     {
-        canDash = false;
-        yield return new WaitForSeconds(dashCooldown);
-        canDash = true;
+        float speed = baseSpeed;
+
+        if (_speedBoostRemaining.Value > 0f)
+        {
+            speed = Mathf.Max(speed, _boostSpeed);
+        }
+
+        if (_slowRemaining.Value > 0f)
+        {
+            speed = Mathf.Min(speed, _slowSpeed);
+        }
+
+        return speed;
+    }
+
+    [ServerRpc]
+    private void SubmitInputServerRpc(float h, float v)
+    {
+        _moveInput = new Vector2(h, v);
+        Vector3 move = new Vector3(h, 0f, v).normalized;
+        if (move != Vector3.zero)
+        {
+            _lastMoveDirection = move;
+        }
+    }
+
+    [ServerRpc]
+    private void DashServerRpc()
+    {
+        if (GameManager.gameOver)
+        {
+            return;
+        }
+
+        transform.position += _lastMoveDirection * dashForce;
     }
 
     public void ApplySlow(float slowSpeed, float duration)
     {
-        if (!IsServer) return;
-        StartCoroutine(SlowRoutine(slowSpeed, duration));
-    }
+        if (!IsServer)
+        {
+            return;
+        }
 
-    IEnumerator SlowRoutine(float slowSpeed, float duration)
-    {
-        currentSpeed = slowSpeed;
-        yield return new WaitForSeconds(duration);
-        currentSpeed = baseSpeed;
+        _slowSpeed = slowSpeed;
+        _slowRemaining.Value = Mathf.Max(_slowRemaining.Value, duration);
+        NotifyLocalClientClientRpc("SLOWED!", new Color(1f, 0.65f, 0.2f), 1.5f, BuildTargetParams());
     }
 
     public void ApplySpeedBoost(float boostedSpeed, float duration)
     {
-        if (!IsServer) return;
-        StartCoroutine(SpeedBoostRoutine(boostedSpeed, duration));
-    }
+        if (!IsServer)
+        {
+            return;
+        }
 
-    IEnumerator SpeedBoostRoutine(float boostedSpeed, float duration)
-    {
-        currentSpeed = boostedSpeed;
-        yield return new WaitForSeconds(duration);
-        currentSpeed = baseSpeed;
+        _boostSpeed = boostedSpeed;
+        _speedBoostRemaining.Value = Mathf.Max(_speedBoostRemaining.Value, duration);
+        NotifyLocalClientClientRpc("SPEED UP", new Color(0.3f, 1f, 0.65f), 1.6f, BuildTargetParams());
     }
 
     public void GiveShield(float duration)
     {
-        if (!IsServer) return;
-        StartCoroutine(ShieldRoutine(duration));
+        if (!IsServer)
+        {
+            return;
+        }
+
+        _shieldRemaining.Value = Mathf.Max(_shieldRemaining.Value, duration);
+        NotifyLocalClientClientRpc("SHIELD ACTIVE", new Color(0.35f, 0.8f, 1f), 1.6f, BuildTargetParams());
     }
 
-    IEnumerator ShieldRoutine(float duration)
+    public void NotifyShieldBlockedDamage()
     {
-        hasShield = true;
-        yield return new WaitForSeconds(duration);
-        hasShield = false;
+        if (!IsServer)
+        {
+            return;
+        }
+
+        NotifyLocalClientClientRpc("SHIELD BLOCKED DAMAGE", new Color(0.35f, 0.8f, 1f), 1.8f, BuildTargetParams());
     }
 
-    public bool HasShield() => hasShield;
+    public void NotifyBombTriggered()
+    {
+        if (!IsServer)
+        {
+            return;
+        }
 
-    public bool IsSpeedBoosted() => currentSpeed > baseSpeed;
+        NotifyLocalClientClientRpc("BOMB TRIGGERED", new Color(1f, 0.45f, 0.35f), 1.2f, BuildTargetParams());
+    }
+
+    public void NotifyBombDamage(int penalty)
+    {
+        if (!IsServer)
+        {
+            return;
+        }
+
+        NotifyLocalClientClientRpc("-" + penalty + " POINTS", new Color(1f, 0.35f, 0.35f), 1.5f, BuildTargetParams());
+    }
+
+    public void NotifyLaserDamage(int penalty)
+    {
+        if (!IsServer)
+        {
+            return;
+        }
+
+        NotifyLocalClientClientRpc("LASER HIT  -" + penalty, new Color(1f, 0.35f, 0.35f), 1.4f, BuildTargetParams());
+    }
+
+    public void NotifyLocalKingCoin()
+    {
+        if (!IsServer)
+        {
+            return;
+        }
+
+        NotifyLocalClientClientRpc("KING COIN +10", new Color(1f, 0.87f, 0.2f), 1.8f, BuildTargetParams());
+    }
+
+    public void NotifyTeleport()
+    {
+        if (!IsServer)
+        {
+            return;
+        }
+
+        NotifyLocalClientClientRpc("TELEPORTED", new Color(0.75f, 0.55f, 1f), 1.4f, BuildTargetParams());
+    }
+
+    public void ResetStatusState()
+    {
+        if (!IsServer)
+        {
+            return;
+        }
+
+        _speedBoostRemaining.Value = 0f;
+        _shieldRemaining.Value = 0f;
+        _slowRemaining.Value = 0f;
+        _dashCooldownRemaining = 0f;
+        _moveInput = Vector2.zero;
+    }
+
+    public bool HasShield()
+    {
+        return _shieldRemaining.Value > 0.01f;
+    }
+
+    public bool IsSpeedBoosted()
+    {
+        return _speedBoostRemaining.Value > 0.01f;
+    }
+
+    public bool IsSlowed()
+    {
+        return _slowRemaining.Value > 0.01f;
+    }
+
+    public float GetShieldRemaining()
+    {
+        return _shieldRemaining.Value;
+    }
+
+    public float GetSpeedBoostRemaining()
+    {
+        return _speedBoostRemaining.Value;
+    }
+
+    public float GetSlowRemaining()
+    {
+        return _slowRemaining.Value;
+    }
+
+    public float GetDashCooldownRemainingLocal()
+    {
+        return Mathf.Max(0f, _dashCooldownRemaining);
+    }
+
+    public float GetDashCooldownDuration()
+    {
+        return dashCooldown;
+    }
+
+    private ClientRpcParams BuildTargetParams()
+    {
+        return new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { OwnerClientId }
+            }
+        };
+    }
+
+    [ClientRpc]
+    private void NotifyLocalClientClientRpc(string message, Color color, float duration, ClientRpcParams rpcParams = default)
+    {
+        if (!IsOwner)
+        {
+            return;
+        }
+
+        UiEventFeed.Push(message, color, duration);
+    }
+
+    private void CacheLocalPlayerLabel()
+    {
+        string label = "Player " + (OwnerClientId + 1);
+        _cachedPlayerLabels[OwnerClientId] = label;
+    }
+
+    public static string GetPlayerLabel(ulong ownerClientId)
+    {
+        if (_cachedPlayerLabels.TryGetValue(ownerClientId, out string cached))
+        {
+            return cached;
+        }
+
+        return "Player " + (ownerClientId + 1);
+    }
 }
