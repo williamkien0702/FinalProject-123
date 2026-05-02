@@ -9,32 +9,26 @@ public class LaserGridManager : NetworkBehaviour
 
     public float eventInterval = 10f;
     public float warningDuration = 2f;
-    public float laserDuration = 1f;
+    public float laserDuration = 2f;
 
-    public int pointPenalty = 5;
+    public float arenaMinX = -50f;
+    public float arenaMaxX = 50f;
+    public float arenaMinZ = -50f;
+    public float arenaMaxZ = 50f;
 
-    public float arenaMinX = -30f;
-    public float arenaMaxX = 30f;
-    public float arenaMinZ = -30f;
-    public float arenaMaxZ = 30f;
-
-    public float gridSpacing = 10f;
+    public float gridSpacing = 20f;
     public float laserLineWidth = 0.8f;
-
-    // Laser beams now sit at roughly chest/eye height so they are
-    // visible and meaningful in a first-person perspective.
     public float laserHeight = 1.2f;
     public float laserThickness = 0.4f;
 
     public static bool laserWarningActive = false;
     public static bool laserFiringActive = false;
 
-    private List<GameObject> activeLaserLines = new List<GameObject>();
+    private List<LaserLine> activeLaserLines = new List<LaserLine>();
 
     public override void OnNetworkSpawn()
     {
         if (!IsServer) return;
-
         StartCoroutine(LaserLoop());
     }
 
@@ -45,9 +39,7 @@ public class LaserGridManager : NetworkBehaviour
         while (true)
         {
             if (!GameManager.gameOver)
-            {
                 yield return StartCoroutine(RunLaserGridEvent());
-            }
 
             yield return new WaitForSeconds(eventInterval);
         }
@@ -55,25 +47,30 @@ public class LaserGridManager : NetworkBehaviour
 
     IEnumerator RunLaserGridEvent()
     {
+        // Warning phase — lasers are visible but canDamage is false
         laserWarningActive = true;
         laserFiringActive = false;
         UpdateLaserStatusClientRpc(true, false);
 
         SpawnLaserGrid();
+        SetLasersDamaging(false);
 
         yield return new WaitForSeconds(warningDuration);
 
+        // Firing phase — enable damage on all laser colliders
         laserWarningActive = false;
         laserFiringActive = true;
         UpdateLaserStatusClientRpc(false, true);
 
-        DamagePlayersOnGridLines();
+        SetLasersDamaging(true);
 
         yield return new WaitForSeconds(laserDuration);
 
+        // Done — disable damage and despawn
         laserFiringActive = false;
         UpdateLaserStatusClientRpc(false, false);
 
+        SetLasersDamaging(false);
         ClearLaserGrid();
     }
 
@@ -106,51 +103,29 @@ public class LaserGridManager : NetworkBehaviour
         NetworkObject netObj = line.GetComponent<NetworkObject>();
         if (netObj != null) netObj.Spawn();
 
-        activeLaserLines.Add(line);
+        LaserLine laserLine = line.GetComponent<LaserLine>();
+        if (laserLine != null)
+            activeLaserLines.Add(laserLine);
     }
 
-    void DamagePlayersOnGridLines()
+    void SetLasersDamaging(bool damaging)
     {
-        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        foreach (LaserLine line in activeLaserLines)
         {
-            if (client.PlayerObject == null) continue;
-
-            Vector3 playerPos = client.PlayerObject.transform.position;
-
-            if (IsOnGridLine(playerPos))
-            {
-                PlayerNetwork playerNetwork = client.PlayerObject.GetComponent<PlayerNetwork>();
-                if (playerNetwork == null) continue;
-
-                playerNetwork.score.Value -= pointPenalty;
-                if (playerNetwork.score.Value < 0) playerNetwork.score.Value = 0;
-            }
+            if (line != null)
+                line.canDamage = damaging;
         }
-    }
-
-    bool IsOnGridLine(Vector3 playerPos)
-    {
-        for (float x = arenaMinX; x <= arenaMaxX; x += gridSpacing)
-        {
-            if (Mathf.Abs(playerPos.x - x) <= laserLineWidth) return true;
-        }
-
-        for (float z = arenaMinZ; z <= arenaMaxZ; z += gridSpacing)
-        {
-            if (Mathf.Abs(playerPos.z - z) <= laserLineWidth) return true;
-        }
-
-        return false;
     }
 
     void ClearLaserGrid()
     {
-        foreach (GameObject line in activeLaserLines)
+        foreach (LaserLine line in activeLaserLines)
         {
             if (line == null) continue;
 
             NetworkObject netObj = line.GetComponent<NetworkObject>();
-            if (netObj != null && netObj.IsSpawned) netObj.Despawn(true);
+            if (netObj != null && netObj.IsSpawned)
+                netObj.Despawn(true);
         }
 
         activeLaserLines.Clear();

@@ -12,12 +12,19 @@ public class KingCoinArrowUI : MonoBehaviour
 
         Transform player = NetworkManager.Singleton.LocalClient.PlayerObject.transform;
 
+        // World-space direction from player to king coin
         Vector3 direction = GameManager.kingCoinPosition - player.position;
         direction.y = 0f;
 
         if (direction == Vector3.zero) return;
 
-        float angle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+        // World-space angle to the coin
+        float worldAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+
+        // Subtract the player's current facing (yaw) so the arrow is
+        // relative to where the player is looking, not world north
+        float playerYaw = player.eulerAngles.y;
+        float relativeAngle = worldAngle - playerYaw;
 
         GUIStyle arrowStyle = new GUIStyle(GUI.skin.label);
         arrowStyle.fontSize = 170;
@@ -27,9 +34,9 @@ public class KingCoinArrowUI : MonoBehaviour
 
         Rect arrowRect = new Rect(Screen.width - 250, 90, 220, 220);
 
-        GUIUtility.RotateAroundPivot(angle, arrowRect.center);
+        GUIUtility.RotateAroundPivot(relativeAngle, arrowRect.center);
         GUI.Label(arrowRect, "↑", arrowStyle);
-        GUIUtility.RotateAroundPivot(-angle, arrowRect.center);
+        GUIUtility.RotateAroundPivot(-relativeAngle, arrowRect.center);
 
         GUIStyle textStyle = new GUIStyle(GUI.skin.label);
         textStyle.fontSize = 22;

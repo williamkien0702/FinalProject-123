@@ -26,7 +26,7 @@ public class GameManager : NetworkBehaviour
     private int totalSpeedPowerUps = 5;
     private int totalShieldPowerUps = 5;
 
-    private int totalWalls = 25;
+    private int totalWalls = 50;
     private int totalBlackHoles = 6;
     private bool timerRunning = false;
 
@@ -81,9 +81,9 @@ public class GameManager : NetworkBehaviour
 
         int spawned = 0;
         int attempts = 0;
-        int maxAttempts = 300;
+        int maxAttempts = 600;          // More attempts needed to fill larger area
 
-        float minWallDistance = 9f;
+        float minWallDistance = 14f;    // Scaled up from 9 to keep walls from clumping
 
         List<Vector3> wallPositions = new List<Vector3>();
 
@@ -92,9 +92,9 @@ public class GameManager : NetworkBehaviour
             attempts++;
 
             Vector3 pos = new Vector3(
-                Random.Range(-26f, 26f),
+                Random.Range(-46f, 46f),    // ~100 unit arena, leaving 4u border
                 1f,
-                Random.Range(-26f, 26f)
+                Random.Range(-46f, 46f)
             );
 
             bool tooClose = false;
@@ -112,9 +112,9 @@ public class GameManager : NetworkBehaviour
 
             bool horizontal = Random.value > 0.5f;
 
-            float randomWallLength = Random.Range(5f, 10f);
+            float randomWallLength = Random.Range(8f, 18f);  // Longer walls to fill space
             float wallThickness = 1f;
-            float wallHeight = 2f;
+            float wallHeight = 34f;
 
             Vector3 scale;
 
@@ -153,7 +153,7 @@ public class GameManager : NetworkBehaviour
             do
             {
                 valid = true;
-                pos = new Vector3(Random.Range(-30, 30), yPosition, Random.Range(-30, 30));
+                pos = new Vector3(Random.Range(-46, 46), yPosition, Random.Range(-46, 46));
 
                 foreach (var p in positions)
                 {

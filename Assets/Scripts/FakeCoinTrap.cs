@@ -3,7 +3,7 @@ using Unity.Netcode;
 
 public class FakeCoinTrap : NetworkBehaviour
 {
-    public float slowSpeed = 6f;
+    public float slowSpeed = 2f;
     public float slowDuration = 2f;
 
     private void OnTriggerEnter(Collider other)

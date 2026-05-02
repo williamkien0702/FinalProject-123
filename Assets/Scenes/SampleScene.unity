@@ -185,7 +185,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 74b4ed54adb920b4e8d1af7e1c4b2b73, type: 2}
+  - {fileID: 2100000, guid: 65f6150ebb7042c49937ee8e44773015, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -723,7 +723,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 50, y: 1, z: 1}
-  m_LocalScale: {x: 100, y: 2, z: 1}
+  m_LocalScale: {x: 110.020004, y: 34, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -1162,7 +1162,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 1, z: -50}
-  m_LocalScale: {x: 100, y: 2, z: 1}
+  m_LocalScale: {x: 107.14001, y: 34, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -1242,13 +1242,14 @@ MonoBehaviour:
   eventInterval: 10
   warningDuration: 1
   laserDuration: 1
-  pointPenalty: 5
   arenaMinX: -60
   arenaMaxX: 60
   arenaMinZ: -60
   arenaMaxZ: 60
   gridSpacing: 2
   laserLineWidth: 0.1
+  laserHeight: 1.2
+  laserThickness: 0.4
 --- !u!1 &1527166559
 GameObject:
   m_ObjectHideFlags: 0
@@ -1435,7 +1436,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 1, z: 50}
-  m_LocalScale: {x: 100, y: 2, z: 1}
+  m_LocalScale: {x: 106.770004, y: 34, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -1547,7 +1548,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
   m_LocalPosition: {x: -50, y: 1, z: 1}
-  m_LocalScale: {x: 99, y: 2, z: 1}
+  m_LocalScale: {x: 110.1375, y: 34, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
