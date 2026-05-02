@@ -1,7 +1,7 @@
+using UnityEngine;
+using Unity.Netcode;
 using System.Collections;
 using System.Collections.Generic;
-using Unity.Netcode;
-using UnityEngine;
 
 public class LaserGridManager : NetworkBehaviour
 {
@@ -21,39 +21,24 @@ public class LaserGridManager : NetworkBehaviour
     public float gridSpacing = 10f;
     public float laserLineWidth = 0.8f;
 
-    public static bool laserWarningActive;
-    public static bool laserFiringActive;
+    // Laser beams now sit at roughly chest/eye height so they are
+    // visible and meaningful in a first-person perspective.
+    public float laserHeight = 1.2f;
+    public float laserThickness = 0.4f;
 
-    private readonly List<GameObject> activeLaserLines = new List<GameObject>();
+    public static bool laserWarningActive = false;
+    public static bool laserFiringActive = false;
+
+    private List<GameObject> activeLaserLines = new List<GameObject>();
 
     public override void OnNetworkSpawn()
     {
-        if (IsServer)
-        {
-            StartCoroutine(LaserLoop());
-        }
-    }
+        if (!IsServer) return;
 
-    public override void OnNetworkDespawn()
-    {
-        StopAllCoroutines();
-        ResetLocalState();
-    }
-
-    public void ResetRoundState()
-    {
-        if (!IsServer)
-        {
-            return;
-        }
-
-        StopAllCoroutines();
-        ClearLaserGrid();
-        ResetAndBroadcastState();
         StartCoroutine(LaserLoop());
     }
 
-    private IEnumerator LaserLoop()
+    IEnumerator LaserLoop()
     {
         yield return new WaitForSeconds(5f);
 
@@ -68,156 +53,111 @@ public class LaserGridManager : NetworkBehaviour
         }
     }
 
-    private IEnumerator RunLaserGridEvent()
+    IEnumerator RunLaserGridEvent()
     {
         laserWarningActive = true;
         laserFiringActive = false;
         UpdateLaserStatusClientRpc(true, false);
 
         SpawnLaserGrid();
-        yield return new WaitForSeconds(warningDuration);
 
-        if (GameManager.gameOver)
-        {
-            ClearLaserGrid();
-            ResetAndBroadcastState();
-            yield break;
-        }
+        yield return new WaitForSeconds(warningDuration);
 
         laserWarningActive = false;
         laserFiringActive = true;
         UpdateLaserStatusClientRpc(false, true);
 
         DamagePlayersOnGridLines();
+
         yield return new WaitForSeconds(laserDuration);
 
-        ResetAndBroadcastState();
+        laserFiringActive = false;
+        UpdateLaserStatusClientRpc(false, false);
+
         ClearLaserGrid();
     }
 
-    private void SpawnLaserGrid()
+    void SpawnLaserGrid()
     {
+        // Vertical lines (extend along Z axis)
         for (float x = arenaMinX; x <= arenaMaxX; x += gridSpacing)
         {
-            Vector3 position = new Vector3(x, 0.25f, 0f);
-            Vector3 scale = new Vector3(laserLineWidth, 0.15f, arenaMaxZ - arenaMinZ);
+            Vector3 position = new Vector3(x, laserHeight, 0f);
+            Vector3 scale = new Vector3(laserLineWidth, laserThickness, arenaMaxZ - arenaMinZ);
             SpawnLaserLine(position, scale);
         }
 
+        // Horizontal lines (extend along X axis)
         for (float z = arenaMinZ; z <= arenaMaxZ; z += gridSpacing)
         {
-            Vector3 position = new Vector3(0f, 0.25f, z);
-            Vector3 scale = new Vector3(arenaMaxX - arenaMinX, 0.15f, laserLineWidth);
+            Vector3 position = new Vector3(0f, laserHeight, z);
+            Vector3 scale = new Vector3(arenaMaxX - arenaMinX, laserThickness, laserLineWidth);
             SpawnLaserLine(position, scale);
         }
     }
 
-    private void SpawnLaserLine(Vector3 position, Vector3 scale)
+    void SpawnLaserLine(Vector3 position, Vector3 scale)
     {
-        if (laserLinePrefab == null)
-        {
-            return;
-        }
+        if (laserLinePrefab == null) return;
 
         GameObject line = Instantiate(laserLinePrefab, position, Quaternion.identity);
         line.transform.localScale = scale;
 
         NetworkObject netObj = line.GetComponent<NetworkObject>();
-        if (netObj != null)
-        {
-            netObj.Spawn();
-        }
+        if (netObj != null) netObj.Spawn();
 
         activeLaserLines.Add(line);
     }
 
-    private void DamagePlayersOnGridLines()
+    void DamagePlayersOnGridLines()
     {
-        foreach (NetworkClient client in NetworkManager.Singleton.ConnectedClientsList)
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
-            if (client.PlayerObject == null)
-            {
-                continue;
-            }
+            if (client.PlayerObject == null) continue;
 
-            Vector3 playerPosition = client.PlayerObject.transform.position;
-            if (!IsOnGridLine(playerPosition))
-            {
-                continue;
-            }
+            Vector3 playerPos = client.PlayerObject.transform.position;
 
-            PlayerNetwork playerNetwork = client.PlayerObject.GetComponent<PlayerNetwork>();
-            PlayerMovement playerMovement = client.PlayerObject.GetComponent<PlayerMovement>();
-            if (playerNetwork == null)
+            if (IsOnGridLine(playerPos))
             {
-                continue;
-            }
+                PlayerNetwork playerNetwork = client.PlayerObject.GetComponent<PlayerNetwork>();
+                if (playerNetwork == null) continue;
 
-            playerNetwork.score.Value = Mathf.Max(0, playerNetwork.score.Value - pointPenalty);
-            if (playerMovement != null)
-            {
-                playerMovement.ShowOwnerNotification("-5 POINTS", "Laser grid hit.", ScoreUI.HudNoticeType.Danger, 1.5f);
+                playerNetwork.score.Value -= pointPenalty;
+                if (playerNetwork.score.Value < 0) playerNetwork.score.Value = 0;
             }
         }
     }
 
-    private bool IsOnGridLine(Vector3 playerPosition)
+    bool IsOnGridLine(Vector3 playerPos)
     {
         for (float x = arenaMinX; x <= arenaMaxX; x += gridSpacing)
         {
-            if (Mathf.Abs(playerPosition.x - x) <= laserLineWidth)
-            {
-                return true;
-            }
+            if (Mathf.Abs(playerPos.x - x) <= laserLineWidth) return true;
         }
 
         for (float z = arenaMinZ; z <= arenaMaxZ; z += gridSpacing)
         {
-            if (Mathf.Abs(playerPosition.z - z) <= laserLineWidth)
-            {
-                return true;
-            }
+            if (Mathf.Abs(playerPos.z - z) <= laserLineWidth) return true;
         }
 
         return false;
     }
 
-    private void ClearLaserGrid()
+    void ClearLaserGrid()
     {
-        for (int i = 0; i < activeLaserLines.Count; i++)
+        foreach (GameObject line in activeLaserLines)
         {
-            GameObject line = activeLaserLines[i];
-            if (line == null)
-            {
-                continue;
-            }
+            if (line == null) continue;
 
             NetworkObject netObj = line.GetComponent<NetworkObject>();
-            if (netObj != null && netObj.IsSpawned)
-            {
-                netObj.Despawn(true);
-            }
+            if (netObj != null && netObj.IsSpawned) netObj.Despawn(true);
         }
 
         activeLaserLines.Clear();
     }
 
-    private void ResetAndBroadcastState()
-    {
-        laserWarningActive = false;
-        laserFiringActive = false;
-        UpdateLaserStatusClientRpc(false, false);
-    }
-
-    private void ResetLocalState()
-    {
-        laserWarningActive = false;
-        laserFiringActive = false;
-        activeLaserLines.Clear();
-    }
-
     [ClientRpc]
-    private void UpdateLaserStatusClientRpc(bool warning, bool firing)
+    void UpdateLaserStatusClientRpc(bool warning, bool firing)
     {
         laserWarningActive = warning;
         laserFiringActive = firing;

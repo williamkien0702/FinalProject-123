@@ -1,37 +1,33 @@
-using Unity.Netcode;
 using UnityEngine;
+using Unity.Netcode;
+using System.Collections;
 
 public class PlayerMovement : NetworkBehaviour
 {
-    public float baseSpeed = 20f;
-    public float dashForce = 12f;
+    public float baseSpeed = 8f;            // Reduced from 20 — FPS games move slower
+    public float dashForce = 6f;
     public float dashCooldown = 3f;
 
+    private float currentSpeed;
+    private bool canDash = true;
+    private bool hasShield = false;
+
+    // Replicated from owner to server each tick
     private Vector2 moveInput = Vector2.zero;
-    private Vector3 lastMoveDirection = Vector3.forward;
-    private float dashReadyTime;
-    private float activeSlowSpeed = 6f;
-    private float activeBoostSpeed = 35f;
+    private float currentYaw = 0f;         // Horizontal facing angle in degrees
 
-    private readonly NetworkVariable<float> speedBoostStartTime = new NetworkVariable<float>(0f);
-    private readonly NetworkVariable<float> speedBoostEndTime = new NetworkVariable<float>(0f);
-    private readonly NetworkVariable<float> slowStartTime = new NetworkVariable<float>(0f);
-    private readonly NetworkVariable<float> slowEndTime = new NetworkVariable<float>(0f);
-    private readonly NetworkVariable<float> shieldStartTime = new NetworkVariable<float>(0f);
-    private readonly NetworkVariable<float> shieldEndTime = new NetworkVariable<float>(0f);
-
-    public override void OnNetworkSpawn()
+    void Awake()
     {
-        if (IsServer)
-        {
-            ResetRoundState();
-        }
+        currentSpeed = baseSpeed;
     }
 
-    private void Update()
+    void Update()
     {
-        if (!IsOwner || GameManager.gameOver)
+        if (!IsOwner) return;
+        if (GameManager.gameOver)
         {
+            // Unlock cursor on game over so UI buttons are clickable
+            TopDownFollowOwner.UnlockCursor();
             return;
         }
 
@@ -51,227 +47,116 @@ public class PlayerMovement : NetworkBehaviour
         }
     }
 
-    [ServerRpc]
-    private void SubmitInputServerRpc(float h, float v)
+    /// <summary>
+    /// Called by FollowOwner on the local client every LateUpdate with the
+    /// current mouse-look yaw so the server can rotate the player body.
+    /// </summary>
+    public void SetYaw(float yaw)
     {
-        moveInput = new Vector2(h, v);
-
-        Vector3 move = new Vector3(h, 0f, v).normalized;
-        if (move != Vector3.zero)
-        {
-            lastMoveDirection = move;
-        }
+        SetYawServerRpc(yaw);
     }
 
-    private void FixedUpdate()
+    [ServerRpc]
+    void SetYawServerRpc(float yaw)
     {
-        if (!IsServer || GameManager.gameOver)
-        {
-            return;
-        }
+        currentYaw = yaw;
+        // Rotate the visible player body to face the direction they are looking
+        transform.rotation = Quaternion.Euler(0f, currentYaw, 0f);
+    }
 
-        float currentSpeed = GetCurrentMoveSpeedServer();
-        Vector3 move = new Vector3(moveInput.x, 0f, moveInput.y).normalized;
+    [ServerRpc]
+    void SubmitInputServerRpc(float h, float v)
+    {
+        moveInput = new Vector2(h, v);
+    }
+
+    void FixedUpdate()
+    {
+        if (!IsServer) return;
+        if (GameManager.gameOver) return;
+
+        // Move relative to the player's current facing direction (yaw)
+        Vector3 forward = new Vector3(
+            Mathf.Sin(currentYaw * Mathf.Deg2Rad), 0f,
+            Mathf.Cos(currentYaw * Mathf.Deg2Rad));
+        Vector3 right = new Vector3(forward.z, 0f, -forward.x);
+
+        Vector3 move = (forward * moveInput.y + right * moveInput.x).normalized;
         Vector3 nextPosition = transform.position + move * currentSpeed * Time.fixedDeltaTime;
 
-        if (!Physics.CheckSphere(nextPosition, 0.6f, LayerMask.GetMask("Wall")))
+        if (!Physics.CheckSphere(nextPosition, 0.4f, LayerMask.GetMask("Wall")))
         {
             transform.position = nextPosition;
         }
     }
 
     [ServerRpc]
-    private void DashServerRpc()
+    void DashServerRpc()
     {
-        if (GameManager.gameOver)
-        {
-            return;
-        }
+        if (!canDash) return;
 
-        float now = GetAuthoritativeTime();
-        if (now < dashReadyTime)
-        {
-            return;
-        }
+        StartCoroutine(DashCooldownRoutine());
 
-        dashReadyTime = now + dashCooldown;
-        transform.position += lastMoveDirection * dashForce;
+        // Dash in the direction the player is facing
+        Vector3 forward = new Vector3(
+            Mathf.Sin(currentYaw * Mathf.Deg2Rad), 0f,
+            Mathf.Cos(currentYaw * Mathf.Deg2Rad));
+
+        // Use move input to pick dash direction; fall back to forward
+        Vector3 right = new Vector3(forward.z, 0f, -forward.x);
+        Vector3 dashDir = (forward * moveInput.y + right * moveInput.x).normalized;
+        if (dashDir == Vector3.zero) dashDir = forward;
+
+        transform.position += dashDir * dashForce;
+    }
+
+    IEnumerator DashCooldownRoutine()
+    {
+        canDash = false;
+        yield return new WaitForSeconds(dashCooldown);
+        canDash = true;
     }
 
     public void ApplySlow(float slowSpeed, float duration)
     {
-        if (!IsServer || GameManager.gameOver)
-        {
-            return;
-        }
+        if (!IsServer) return;
+        StartCoroutine(SlowRoutine(slowSpeed, duration));
+    }
 
-        float now = GetAuthoritativeTime();
-        activeSlowSpeed = slowSpeed;
-        slowStartTime.Value = now;
-        slowEndTime.Value = now + duration;
-
-        ShowOwnerNotification("SLOWED!", "Fake coin penalty active.", ScoreUI.HudNoticeType.Warning, Mathf.Max(1.3f, duration));
+    IEnumerator SlowRoutine(float slowSpeed, float duration)
+    {
+        currentSpeed = slowSpeed;
+        yield return new WaitForSeconds(duration);
+        currentSpeed = baseSpeed;
     }
 
     public void ApplySpeedBoost(float boostedSpeed, float duration)
     {
-        if (!IsServer || GameManager.gameOver)
-        {
-            return;
-        }
+        if (!IsServer) return;
+        StartCoroutine(SpeedBoostRoutine(boostedSpeed, duration));
+    }
 
-        float now = GetAuthoritativeTime();
-        activeBoostSpeed = boostedSpeed;
-        speedBoostStartTime.Value = now;
-        speedBoostEndTime.Value = now + duration;
-
-        ShowOwnerNotification("SPEED UP", "Movement boosted.", ScoreUI.HudNoticeType.Success, Mathf.Max(1.3f, duration));
+    IEnumerator SpeedBoostRoutine(float boostedSpeed, float duration)
+    {
+        currentSpeed = boostedSpeed;
+        yield return new WaitForSeconds(duration);
+        currentSpeed = baseSpeed;
     }
 
     public void GiveShield(float duration)
     {
-        if (!IsServer || GameManager.gameOver)
-        {
-            return;
-        }
-
-        float now = GetAuthoritativeTime();
-        shieldStartTime.Value = now;
-        shieldEndTime.Value = now + duration;
-
-        ShowOwnerNotification("SHIELD READY", "Bomb damage is blocked.", ScoreUI.HudNoticeType.Success, Mathf.Max(1.3f, duration));
+        if (!IsServer) return;
+        StartCoroutine(ShieldRoutine(duration));
     }
 
-    public void ResetRoundState()
+    IEnumerator ShieldRoutine(float duration)
     {
-        if (!IsServer)
-        {
-            return;
-        }
-
-        moveInput = Vector2.zero;
-        lastMoveDirection = Vector3.forward;
-        dashReadyTime = 0f;
-        activeSlowSpeed = 6f;
-        activeBoostSpeed = 35f;
-
-        speedBoostStartTime.Value = 0f;
-        speedBoostEndTime.Value = 0f;
-        slowStartTime.Value = 0f;
-        slowEndTime.Value = 0f;
-        shieldStartTime.Value = 0f;
-        shieldEndTime.Value = 0f;
+        hasShield = true;
+        yield return new WaitForSeconds(duration);
+        hasShield = false;
     }
 
-    public bool HasShield()
-    {
-        return GetShieldRemaining() > 0f;
-    }
+    public bool HasShield() => hasShield;
 
-    public bool IsSpeedBoosted()
-    {
-        return GetSpeedBoostRemaining() > 0f;
-    }
-
-    public bool IsSlowed()
-    {
-        return GetSlowRemaining() > 0f;
-    }
-
-    public float GetShieldRemaining()
-    {
-        return GetRemainingTime(shieldEndTime.Value);
-    }
-
-    public float GetSpeedBoostRemaining()
-    {
-        return GetRemainingTime(speedBoostEndTime.Value);
-    }
-
-    public float GetSlowRemaining()
-    {
-        return GetRemainingTime(slowEndTime.Value);
-    }
-
-    public float GetShieldNormalized()
-    {
-        return GetEffectNormalized(shieldStartTime.Value, shieldEndTime.Value);
-    }
-
-    public float GetSpeedBoostNormalized()
-    {
-        return GetEffectNormalized(speedBoostStartTime.Value, speedBoostEndTime.Value);
-    }
-
-    public float GetSlowNormalized()
-    {
-        return GetEffectNormalized(slowStartTime.Value, slowEndTime.Value);
-    }
-
-    public void ShowOwnerNotification(string title, string subtitle, ScoreUI.HudNoticeType type, float duration = 1.8f)
-    {
-        if (!IsServer || !IsSpawned)
-        {
-            return;
-        }
-
-        ClientRpcParams rpcParams = new ClientRpcParams
-        {
-            Send = new ClientRpcSendParams
-            {
-                TargetClientIds = new[] { OwnerClientId }
-            }
-        };
-
-        ShowOwnerNotificationClientRpc(title, subtitle, (int)type, duration, rpcParams);
-    }
-
-    [ClientRpc]
-    private void ShowOwnerNotificationClientRpc(string title, string subtitle, int type, float duration, ClientRpcParams clientRpcParams = default(ClientRpcParams))
-    {
-        ScoreUI.QueueLocalNotification(title, subtitle, (ScoreUI.HudNoticeType)type, duration);
-    }
-
-    private float GetCurrentMoveSpeedServer()
-    {
-        float speed = baseSpeed;
-
-        if (GetRemainingTime(slowEndTime.Value) > 0f)
-        {
-            speed = activeSlowSpeed;
-        }
-
-        if (GetRemainingTime(speedBoostEndTime.Value) > 0f)
-        {
-            speed = Mathf.Max(speed, activeBoostSpeed);
-        }
-
-        return speed;
-    }
-
-    private float GetRemainingTime(float endTime)
-    {
-        return Mathf.Max(0f, endTime - GetAuthoritativeTime());
-    }
-
-    private float GetEffectNormalized(float startTime, float endTime)
-    {
-        float total = endTime - startTime;
-        if (total <= 0f)
-        {
-            return 0f;
-        }
-
-        return Mathf.Clamp01((endTime - GetAuthoritativeTime()) / total);
-    }
-
-    private float GetAuthoritativeTime()
-    {
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
-        {
-            return (float)NetworkManager.Singleton.ServerTime.Time;
-        }
-
-        return Time.time;
-    }
+    public bool IsSpeedBoosted() => currentSpeed > baseSpeed;
 }

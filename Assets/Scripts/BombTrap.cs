@@ -1,6 +1,6 @@
-using System.Collections;
-using Unity.Netcode;
 using UnityEngine;
+using Unity.Netcode;
+using System.Collections;
 
 public class BombTrap : NetworkBehaviour
 {
@@ -9,100 +9,61 @@ public class BombTrap : NetworkBehaviour
     public float explosionRadius = 5f;
     public int pointPenalty = 5;
 
-    private bool activated;
+    private bool activated = false;
 
-    private void Update()
+    void Update()
     {
-        if (!IsServer || activated || GameManager.gameOver)
-        {
-            return;
-        }
+        if (!IsServer) return;
+        if (activated) return;
 
-        foreach (NetworkClient client in NetworkManager.Singleton.ConnectedClientsList)
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
-            if (client.PlayerObject == null)
-            {
-                continue;
-            }
+            if (client.PlayerObject == null) continue;
 
             float distance = Vector3.Distance(transform.position, client.PlayerObject.transform.position);
+
             if (distance <= activationRadius)
             {
                 activated = true;
-                WarnNearbyPlayers();
                 StartCoroutine(ExplodeAfterDelay());
                 break;
             }
         }
     }
 
-    private void WarnNearbyPlayers()
-    {
-        foreach (NetworkClient client in NetworkManager.Singleton.ConnectedClientsList)
-        {
-            if (client.PlayerObject == null)
-            {
-                continue;
-            }
-
-            float distance = Vector3.Distance(transform.position, client.PlayerObject.transform.position);
-            if (distance <= explosionRadius + 1f)
-            {
-                PlayerMovement playerMovement = client.PlayerObject.GetComponent<PlayerMovement>();
-                if (playerMovement != null)
-                {
-                    playerMovement.ShowOwnerNotification("BOMB TRIGGERED!", "Move away from the blast.", ScoreUI.HudNoticeType.Danger, Mathf.Max(1.2f, explosionDelay));
-                }
-            }
-        }
-    }
-
-    private IEnumerator ExplodeAfterDelay()
+    IEnumerator ExplodeAfterDelay()
     {
         yield return new WaitForSeconds(explosionDelay);
 
-        if (GameManager.gameOver)
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
-            DespawnSelf();
-            yield break;
-        }
-
-        foreach (NetworkClient client in NetworkManager.Singleton.ConnectedClientsList)
-        {
-            if (client.PlayerObject == null)
-            {
-                continue;
-            }
+            if (client.PlayerObject == null) continue;
 
             float distance = Vector3.Distance(transform.position, client.PlayerObject.transform.position);
-            if (distance > explosionRadius)
-            {
-                continue;
-            }
 
-            PlayerNetwork playerNetwork = client.PlayerObject.GetComponent<PlayerNetwork>();
-            PlayerMovement playerMovement = client.PlayerObject.GetComponent<PlayerMovement>();
-            if (playerNetwork == null || playerMovement == null)
+            if (distance <= explosionRadius)
             {
-                continue;
-            }
+                PlayerNetwork playerNetwork = client.PlayerObject.GetComponent<PlayerNetwork>();
+                PlayerMovement playerMovement = client.PlayerObject.GetComponent<PlayerMovement>();
 
-            if (playerMovement.HasShield())
-            {
-                playerMovement.ShowOwnerNotification("SHIELD BLOCKED DAMAGE", "The bomb was absorbed.", ScoreUI.HudNoticeType.Success, 1.6f);
-                continue;
-            }
+                if (playerNetwork == null || playerMovement == null) continue;
 
-            playerNetwork.score.Value = Mathf.Max(0, playerNetwork.score.Value - pointPenalty);
-            playerMovement.ShowOwnerNotification("-5 POINTS", "Bomb hit.", ScoreUI.HudNoticeType.Danger, 1.5f);
+                if (playerMovement.HasShield())
+                {
+                    continue;
+                }
+
+                playerNetwork.score.Value -= pointPenalty;
+
+                if (playerNetwork.score.Value < 0)
+                {
+                    playerNetwork.score.Value = 0;
+                }
+            }
         }
 
-        DespawnSelf();
-    }
-
-    private void DespawnSelf()
-    {
         NetworkObject netObj = GetComponent<NetworkObject>();
+
         if (netObj != null && netObj.IsSpawned)
         {
             netObj.Despawn(true);

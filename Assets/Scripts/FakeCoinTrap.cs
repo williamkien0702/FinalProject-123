@@ -1,5 +1,5 @@
-using Unity.Netcode;
 using UnityEngine;
+using Unity.Netcode;
 
 public class FakeCoinTrap : NetworkBehaviour
 {
@@ -8,20 +8,16 @@ public class FakeCoinTrap : NetworkBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!IsServer || GameManager.gameOver)
-        {
-            return;
-        }
+        if (!IsServer) return;
 
         PlayerMovement player = other.GetComponent<PlayerMovement>();
-        if (player == null)
-        {
-            return;
-        }
+
+        if (player == null) return;
 
         player.ApplySlow(slowSpeed, slowDuration);
 
         NetworkObject netObj = GetComponent<NetworkObject>();
+
         if (netObj != null && netObj.IsSpawned)
         {
             netObj.Despawn(true);

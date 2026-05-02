@@ -1,5 +1,5 @@
-using Unity.Netcode;
 using UnityEngine;
+using Unity.Netcode;
 
 public class KingCoin : NetworkBehaviour
 {
@@ -7,29 +7,17 @@ public class KingCoin : NetworkBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!IsServer || GameManager.gameOver)
-        {
-            return;
-        }
+        if (!IsServer) return;
 
-        PlayerNetwork playerNetwork = other.GetComponent<PlayerNetwork>();
-        if (playerNetwork == null)
-        {
-            return;
-        }
+        PlayerNetwork player = other.GetComponent<PlayerNetwork>();
+        if (player == null) return;
 
-        playerNetwork.score.Value += pointValue;
+        player.score.Value += pointValue;
 
-        PlayerMovement playerMovement = other.GetComponent<PlayerMovement>();
-        if (playerMovement != null)
+        GameManager gm = Object.FindFirstObjectByType<GameManager>();
+        if (gm != null)
         {
-            playerMovement.ShowOwnerNotification("KING COIN +10", "Big score bonus collected.", ScoreUI.HudNoticeType.Objective, 2f);
-        }
-
-        GameManager gameManager = Object.FindFirstObjectByType<GameManager>();
-        if (gameManager != null)
-        {
-            gameManager.KingCoinCollected();
+            gm.KingCoinCollected();
         }
 
         NetworkObject netObj = GetComponent<NetworkObject>();

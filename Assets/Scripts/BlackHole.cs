@@ -1,76 +1,81 @@
-using Unity.Netcode;
 using UnityEngine;
+using Unity.Netcode;
 
 public class BlackHoleTrap : NetworkBehaviour
 {
     public float triggerRadius = 2f;
+
     public float teleportMinDistance = 12f;
     public float teleportMaxDistance = 28f;
+
     public float arenaMinX = -30f;
     public float arenaMaxX = 30f;
     public float arenaMinZ = -30f;
     public float arenaMaxZ = 30f;
 
-    private bool used;
+    private bool used = false;
 
-    private void Update()
+    void Update()
     {
-        if (!IsServer || used || GameManager.gameOver)
-        {
-            return;
-        }
+        if (!IsServer) return;
+        if (used) return;
 
-        foreach (NetworkClient client in NetworkManager.Singleton.ConnectedClientsList)
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
-            if (client.PlayerObject == null)
-            {
-                continue;
-            }
+            if (client.PlayerObject == null) continue;
 
-            float distance = Vector3.Distance(transform.position, client.PlayerObject.transform.position);
+            float distance = Vector3.Distance(
+                transform.position,
+                client.PlayerObject.transform.position
+            );
+
             if (distance <= triggerRadius)
             {
                 used = true;
+
                 TeleportPlayer(client.PlayerObject.gameObject);
+
+                NetworkObject netObj = GetComponent<NetworkObject>();
+
+                if (netObj != null && netObj.IsSpawned)
+                {
+                    netObj.Despawn(true);
+                }
+
                 break;
             }
         }
     }
 
-    private void TeleportPlayer(GameObject playerObject)
+    void TeleportPlayer(GameObject player)
     {
-        Vector3 oldPosition = playerObject.transform.position;
-        Vector3 newPosition = oldPosition;
+        Vector3 oldPos = player.transform.position;
+        Vector3 newPos = oldPos;
 
         for (int i = 0; i < 20; i++)
         {
             float angle = Random.Range(0f, 360f);
             float distance = Random.Range(teleportMinDistance, teleportMaxDistance);
-            Vector3 direction = new Vector3(Mathf.Cos(angle * Mathf.Deg2Rad), 0f, Mathf.Sin(angle * Mathf.Deg2Rad));
-            Vector3 candidate = oldPosition + direction * distance;
+
+            Vector3 direction = new Vector3(
+                Mathf.Cos(angle * Mathf.Deg2Rad),
+                0f,
+                Mathf.Sin(angle * Mathf.Deg2Rad)
+            );
+
+            Vector3 candidate = oldPos + direction * distance;
+
             candidate.x = Mathf.Clamp(candidate.x, arenaMinX, arenaMaxX);
             candidate.z = Mathf.Clamp(candidate.z, arenaMinZ, arenaMaxZ);
-            candidate.y = oldPosition.y;
+            candidate.y = oldPos.y;
 
-            if (Vector3.Distance(oldPosition, candidate) >= teleportMinDistance)
+            if (Vector3.Distance(oldPos, candidate) >= teleportMinDistance)
             {
-                newPosition = candidate;
+                newPos = candidate;
                 break;
             }
         }
 
-        playerObject.transform.position = newPosition;
-
-        PlayerMovement playerMovement = playerObject.GetComponent<PlayerMovement>();
-        if (playerMovement != null)
-        {
-            playerMovement.ShowOwnerNotification("TELEPORTED!", "Black hole warped you away.", ScoreUI.HudNoticeType.Info, 1.8f);
-        }
-
-        NetworkObject netObj = GetComponent<NetworkObject>();
-        if (netObj != null && netObj.IsSpawned)
-        {
-            netObj.Despawn(true);
-        }
+        player.transform.position = newPos;
     }
 }
