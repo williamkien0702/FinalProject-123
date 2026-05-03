@@ -5,6 +5,7 @@ using System.Collections.Generic;
 
 public class GameManager : NetworkBehaviour
 {
+    [Header("Prefabs")]
     public GameObject coinPrefab;
     public GameObject fakeCoinPrefab;
     public GameObject bombPrefab;
@@ -14,114 +15,187 @@ public class GameManager : NetworkBehaviour
     public GameObject wallPrefab;
     public GameObject blackHolePrefab;
 
+    [Header("Round Settings")]
+    [SerializeField] private float roundDuration = 90f;
+
+    [Header("Spawn Counts")]
+    [SerializeField] private int totalCoins = 80;
+    [SerializeField] private int totalFakeCoins = 15;
+    [SerializeField] private int totalBombs = 8;
+    [SerializeField] private int totalSpeedPowerUps = 5;
+    [SerializeField] private int totalShieldPowerUps = 5;
+    [SerializeField] private int totalWalls = 25;
+    [SerializeField] private int totalBlackHoles = 6;
+
     public static bool gameOver = false;
-    public static string winnerText = string.Empty;
+    public static string winnerText = "";
     public static float timeRemaining = 90f;
     public static Vector3 kingCoinPosition;
     public static bool kingCoinActive = false;
 
-    private const int TotalCoins = 80;
-    private const int TotalFakeCoins = 15;
-    private const int TotalBombs = 8;
-    private const int TotalSpeedPowerUps = 5;
-    private const int TotalShieldPowerUps = 5;
-    private const int TotalWalls = 25;
-    private const int TotalBlackHoles = 6;
+    private bool timerRunning = false;
 
-    private bool _timerRunning;
+    private readonly NetworkVariable<float> syncedTimeRemaining =
+        new NetworkVariable<float>(90f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    private readonly NetworkVariable<bool> syncedKingCoinActive =
+        new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    private readonly NetworkVariable<Vector3> syncedKingCoinPosition =
+        new NetworkVariable<Vector3>(Vector3.zero, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    private readonly NetworkVariable<bool> syncedGameOver =
+        new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     public override void OnNetworkSpawn()
     {
+        base.OnNetworkSpawn();
+
+        syncedTimeRemaining.OnValueChanged += OnTimeChanged;
+        syncedKingCoinActive.OnValueChanged += OnKingCoinActiveChanged;
+        syncedKingCoinPosition.OnValueChanged += OnKingCoinPositionChanged;
+        syncedGameOver.OnValueChanged += OnGameOverChanged;
+
+        timeRemaining = syncedTimeRemaining.Value;
+        kingCoinActive = syncedKingCoinActive.Value;
+        kingCoinPosition = syncedKingCoinPosition.Value;
+        gameOver = syncedGameOver.Value;
+
         if (IsServer)
         {
             StartGame();
         }
     }
 
+    public override void OnNetworkDespawn()
+    {
+        syncedTimeRemaining.OnValueChanged -= OnTimeChanged;
+        syncedKingCoinActive.OnValueChanged -= OnKingCoinActiveChanged;
+        syncedKingCoinPosition.OnValueChanged -= OnKingCoinPositionChanged;
+        syncedGameOver.OnValueChanged -= OnGameOverChanged;
+
+        base.OnNetworkDespawn();
+    }
+
+    private void OnTimeChanged(float previous, float current)
+    {
+        timeRemaining = current;
+    }
+
+    private void OnKingCoinActiveChanged(bool previous, bool current)
+    {
+        kingCoinActive = current;
+    }
+
+    private void OnKingCoinPositionChanged(Vector3 previous, Vector3 current)
+    {
+        kingCoinPosition = current;
+    }
+
+    private void OnGameOverChanged(bool previous, bool current)
+    {
+        gameOver = current;
+    }
+
     private void Update()
     {
-        if (!IsServer || !_timerRunning || gameOver)
-        {
-            return;
-        }
+        if (!IsServer) return;
+        if (!IsNetworkReady()) return;
+        if (!timerRunning) return;
+        if (gameOver) return;
 
-        timeRemaining -= Time.deltaTime;
-        if (timeRemaining <= 0f)
+        syncedTimeRemaining.Value -= Time.deltaTime;
+        if (syncedTimeRemaining.Value <= 0f)
         {
-            timeRemaining = 0f;
+            syncedTimeRemaining.Value = 0f;
             EndGame();
         }
 
-        UpdateTimerClientRpc(timeRemaining);
+        timeRemaining = syncedTimeRemaining.Value;
+    }
+
+    private bool IsNetworkReady()
+    {
+        return NetworkManager.Singleton != null &&
+               NetworkManager.Singleton.IsListening &&
+               IsSpawned;
     }
 
     private void StartGame()
     {
+        if (!IsServer) return;
+        if (!IsNetworkReady()) return;
+
         gameOver = false;
-        winnerText = string.Empty;
-        timeRemaining = 90f;
-        _timerRunning = true;
+        winnerText = "";
+        timerRunning = true;
+
+        syncedGameOver.Value = false;
+        syncedTimeRemaining.Value = roundDuration;
+        syncedKingCoinActive.Value = false;
+        syncedKingCoinPosition.Value = Vector3.zero;
+
+        timeRemaining = roundDuration;
         kingCoinActive = false;
+        kingCoinPosition = Vector3.zero;
 
         SpawnWalls();
-        SpawnObjects(coinPrefab, TotalCoins, 0.5f);
-        SpawnObjects(fakeCoinPrefab, TotalFakeCoins, 0.5f);
-        SpawnObjects(bombPrefab, TotalBombs, 0.5f);
-        SpawnObjects(speedPowerUpPrefab, TotalSpeedPowerUps, 0.5f);
-        SpawnObjects(shieldPowerUpPrefab, TotalShieldPowerUps, 0.5f);
-        SpawnObjects(blackHolePrefab, TotalBlackHoles, 0.8f);
-        StartCoroutine(SpawnKingCoinAfterDelay(5f));
+        SpawnObjects(coinPrefab, totalCoins, 0.5f);
+        SpawnObjects(fakeCoinPrefab, totalFakeCoins, 0.5f);
+        SpawnObjects(bombPrefab, totalBombs, 0.5f);
+        SpawnObjects(speedPowerUpPrefab, totalSpeedPowerUps, 0.5f);
+        SpawnObjects(shieldPowerUpPrefab, totalShieldPowerUps, 0.5f);
+        SpawnObjects(blackHolePrefab, totalBlackHoles, 0.8f);
 
-        UpdateTimerClientRpc(timeRemaining);
-        UpdateKingCoinClientRpc(Vector3.zero, false);
-        RestartGameClientRpc();
+        StartCoroutine(SpawnKingCoinAfterDelay(5f));
     }
 
     private void SpawnWalls()
     {
-        if (wallPrefab == null)
-        {
-            return;
-        }
+        if (wallPrefab == null) return;
 
         int spawned = 0;
         int attempts = 0;
-        const int maxAttempts = 300;
-        const float minWallDistance = 9f;
+        int maxAttempts = 300;
+        float minWallDistance = 9f;
         List<Vector3> wallPositions = new List<Vector3>();
 
-        while (spawned < TotalWalls && attempts < maxAttempts)
+        while (spawned < totalWalls && attempts < maxAttempts)
         {
             attempts++;
-            Vector3 pos = new Vector3(Random.Range(-26f, 26f), 1f, Random.Range(-26f, 26f));
+
+            Vector3 pos = new Vector3(
+                Random.Range(-26f, 26f),
+                1f,
+                Random.Range(-26f, 26f)
+            );
 
             bool tooClose = false;
-            for (int i = 0; i < wallPositions.Count; i++)
+            foreach (Vector3 existingPos in wallPositions)
             {
-                if (Vector3.Distance(pos, wallPositions[i]) < minWallDistance)
+                if (Vector3.Distance(pos, existingPos) < minWallDistance)
                 {
                     tooClose = true;
                     break;
                 }
             }
 
-            if (tooClose)
-            {
-                continue;
-            }
+            if (tooClose) continue;
 
             bool horizontal = Random.value > 0.5f;
             float randomWallLength = Random.Range(5f, 10f);
             float wallThickness = 1f;
             float wallHeight = 2f;
+
             Vector3 scale = horizontal
                 ? new Vector3(randomWallLength, wallHeight, wallThickness)
                 : new Vector3(wallThickness, wallHeight, randomWallLength);
 
             GameObject wall = Instantiate(wallPrefab, pos, Quaternion.identity);
             wall.transform.localScale = scale;
+
             NetworkObject netObj = wall.GetComponent<NetworkObject>();
-            if (netObj != null)
+            if (netObj != null && !netObj.IsSpawned)
             {
                 netObj.Spawn();
             }
@@ -133,12 +207,10 @@ public class GameManager : NetworkBehaviour
 
     private void SpawnObjects(GameObject prefab, int amount, float yPosition)
     {
-        if (prefab == null)
-        {
-            return;
-        }
+        if (prefab == null) return;
 
         List<Vector3> positions = new List<Vector3>();
+
         for (int i = 0; i < amount; i++)
         {
             Vector3 pos;
@@ -148,9 +220,10 @@ public class GameManager : NetworkBehaviour
             {
                 valid = true;
                 pos = new Vector3(Random.Range(-30f, 30f), yPosition, Random.Range(-30f, 30f));
-                for (int p = 0; p < positions.Count; p++)
+
+                foreach (Vector3 p in positions)
                 {
-                    if (Vector3.Distance(positions[p], pos) < 1.5f)
+                    if (Vector3.Distance(p, pos) < 1.5f)
                     {
                         valid = false;
                         break;
@@ -160,9 +233,10 @@ public class GameManager : NetworkBehaviour
             while (!valid);
 
             positions.Add(pos);
+
             GameObject obj = Instantiate(prefab, pos, Quaternion.identity);
             NetworkObject netObj = obj.GetComponent<NetworkObject>();
-            if (netObj != null)
+            if (netObj != null && !netObj.IsSpawned)
             {
                 netObj.Spawn();
             }
@@ -173,85 +247,85 @@ public class GameManager : NetworkBehaviour
     {
         yield return new WaitForSeconds(delay);
 
-        if (!IsServer || gameOver || kingCoinActive)
-        {
-            yield break;
-        }
+        if (!IsServer) yield break;
+        if (!IsNetworkReady()) yield break;
+        if (gameOver) yield break;
+        if (syncedKingCoinActive.Value) yield break;
 
         SpawnKingCoin();
     }
 
     private void SpawnKingCoin()
     {
-        if (kingCoinPrefab == null)
-        {
-            return;
-        }
+        if (kingCoinPrefab == null) return;
+        if (!IsServer) return;
+        if (!IsNetworkReady()) return;
 
         Vector3 pos = new Vector3(Random.Range(-28f, 28f), 0.8f, Random.Range(-28f, 28f));
         GameObject kingCoin = Instantiate(kingCoinPrefab, pos, Quaternion.identity);
+
         NetworkObject netObj = kingCoin.GetComponent<NetworkObject>();
-        if (netObj != null)
+        if (netObj != null && !netObj.IsSpawned)
         {
             netObj.Spawn();
         }
 
+        syncedKingCoinPosition.Value = pos;
+        syncedKingCoinActive.Value = true;
+
         kingCoinPosition = pos;
         kingCoinActive = true;
-        UpdateKingCoinClientRpc(pos, true);
-        BroadcastUiToastClientRpc("KING COIN ACTIVE", new Color(1f, 0.87f, 0.2f), 1.8f);
     }
 
     public void KingCoinCollected()
     {
-        if (!IsServer)
-        {
-            return;
-        }
+        if (!IsServer) return;
+        if (!IsNetworkReady()) return;
+
+        syncedKingCoinActive.Value = false;
+        syncedKingCoinPosition.Value = Vector3.zero;
 
         kingCoinActive = false;
-        UpdateKingCoinClientRpc(Vector3.zero, false);
+        kingCoinPosition = Vector3.zero;
+
         StartCoroutine(SpawnKingCoinAfterDelay(10f));
     }
 
     public void CoinCollected()
     {
-        if (!IsServer)
-        {
-            return;
-        }
+        if (!IsServer) return;
+        // Timer-based game end; normal coins do not end the round.
     }
 
     private void EndGame()
     {
-        if (gameOver)
-        {
-            return;
-        }
+        if (gameOver) return;
+        if (!IsServer) return;
+        if (!IsNetworkReady()) return;
 
         gameOver = true;
-        _timerRunning = false;
+        timerRunning = false;
+        syncedGameOver.Value = true;
 
         int bestScore = int.MinValue;
         int winnerId = -1;
         bool tie = false;
 
-        PlayerNetwork[] players = FindObjectsByType<PlayerNetwork>(FindObjectsSortMode.None);
-        foreach (PlayerNetwork pn in players)
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
-            if (pn == null || !pn.IsSpawned)
-            {
-                continue;
-            }
+            var playerObj = client.PlayerObject;
+            if (playerObj == null) continue;
 
-            int score = pn.score.Value;
-            if (score > bestScore)
+            var pn = playerObj.GetComponent<PlayerNetwork>();
+            if (pn == null) continue;
+
+            if (pn.score.Value > bestScore)
             {
-                bestScore = score;
-                winnerId = (int)pn.OwnerClientId + 1;
+                bestScore = pn.score.Value;
+                winnerId = (int)client.ClientId + 1;
                 tie = false;
             }
-            else if (score == bestScore)
+            else if (pn.score.Value == bestScore)
             {
                 tie = true;
             }
@@ -266,57 +340,37 @@ public class GameManager : NetworkBehaviour
     {
         gameOver = true;
         winnerText = text;
-        UiEventFeed.ClearAll();
-    }
-
-    [ClientRpc]
-    private void UpdateTimerClientRpc(float time)
-    {
-        timeRemaining = time;
-    }
-
-    [ClientRpc]
-    private void UpdateKingCoinClientRpc(Vector3 pos, bool active)
-    {
-        kingCoinPosition = pos;
-        kingCoinActive = active;
-    }
-
-    [ClientRpc]
-    private void BroadcastUiToastClientRpc(string message, Color color, float duration)
-    {
-        UiEventFeed.Push(message, color, duration);
     }
 
     [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
     public void RestartGameServerRpc()
     {
+        if (!IsServer) return;
+        if (!IsNetworkReady()) return;
+
         StopAllCoroutines();
 
-        PlayerNetwork[] players = FindObjectsByType<PlayerNetwork>(FindObjectsSortMode.None);
-        foreach (PlayerNetwork pn in players)
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
-            if (pn == null)
+            var playerObj = client.PlayerObject;
+            if (playerObj == null) continue;
+
+            var pn = playerObj.GetComponent<PlayerNetwork>();
+            if (pn != null)
             {
-                continue;
+                pn.score.Value = 0;
             }
 
-            pn.score.Value = 0;
-
-            PlayerMovement movement = pn.GetComponent<PlayerMovement>();
-            if (movement != null)
+            var pm = playerObj.GetComponent<PlayerMovement>();
+            if (pm != null)
             {
-                movement.ResetStatusState();
+                pm.ResetStatusState();
             }
         }
 
-        NetworkObject[] netObjects = FindObjectsByType<NetworkObject>(FindObjectsSortMode.None);
-        foreach (NetworkObject netObj in netObjects)
+        foreach (var netObj in FindObjectsByType<NetworkObject>(FindObjectsSortMode.None))
         {
-            if (netObj == null || !netObj.IsSpawned)
-            {
-                continue;
-            }
+            if (!netObj.IsSpawned) continue;
 
             if (netObj.CompareTag("Coin") ||
                 netObj.CompareTag("Trap") ||
@@ -329,15 +383,16 @@ public class GameManager : NetworkBehaviour
         }
 
         StartGame();
+        RestartGameClientRpc();
     }
 
     [ClientRpc]
     private void RestartGameClientRpc()
     {
         gameOver = false;
-        winnerText = string.Empty;
-        timeRemaining = 90f;
+        winnerText = "";
+        timeRemaining = roundDuration;
         kingCoinActive = false;
-        UiEventFeed.ClearAll();
+        kingCoinPosition = Vector3.zero;
     }
 }
