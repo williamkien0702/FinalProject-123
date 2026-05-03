@@ -34,10 +34,16 @@ public class BlackHoleTrap : NetworkBehaviour
             {
                 _used = true;
                 TeleportPlayer(player.gameObject);
+
                 PlayerMovement movement = player.GetComponent<PlayerMovement>();
                 if (movement != null)
                 {
                     movement.NotifyTeleport();
+                }
+
+                if (player.IsOwner)
+                {
+                    FineMarbleSfx.Instance?.PlayTeleport();
                 }
 
                 NetworkObject netObj = GetComponent<NetworkObject>();

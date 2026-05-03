@@ -49,12 +49,18 @@ public class LaserGridManager : NetworkBehaviour
         laserWarningActive = true;
         laserFiringActive = false;
         UpdateLaserStatusClientRpc(true, false);
+
+        FineMarbleSfx.Instance?.PlayLaserWarning();
+
         SpawnLaserGrid();
         yield return new WaitForSeconds(warningDuration);
 
         laserWarningActive = false;
         laserFiringActive = true;
         UpdateLaserStatusClientRpc(false, true);
+
+        FineMarbleSfx.Instance?.PlayLaserHit();
+
         DamagePlayersOnGridLines();
         yield return new WaitForSeconds(laserDuration);
 
@@ -117,10 +123,16 @@ public class LaserGridManager : NetworkBehaviour
             }
 
             playerNetwork.score.Value = Mathf.Max(0, playerNetwork.score.Value - pointPenalty);
+
             PlayerMovement movement = playerNetwork.GetComponent<PlayerMovement>();
             if (movement != null)
             {
                 movement.NotifyLaserDamage(pointPenalty);
+            }
+
+            if (playerNetwork.IsOwner)
+            {
+                FineMarbleSfx.Instance?.PlayLaserHit();
             }
         }
     }

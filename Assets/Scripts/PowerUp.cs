@@ -26,13 +26,25 @@ public class PowerUp : NetworkBehaviour
             return;
         }
 
+        PlayerNetwork playerNetwork = other.GetComponent<PlayerNetwork>();
+
         if (powerUpType == PowerUpType.SpeedBoost)
         {
             player.ApplySpeedBoost(boostedSpeed, duration);
+
+            if (playerNetwork != null && playerNetwork.IsOwner)
+            {
+                FineMarbleSfx.Instance?.PlaySpeedBoost();
+            }
         }
         else if (powerUpType == PowerUpType.Shield)
         {
             player.GiveShield(duration);
+
+            if (playerNetwork != null && playerNetwork.IsOwner)
+            {
+                FineMarbleSfx.Instance?.PlayShieldPickup();
+            }
         }
 
         NetworkObject netObj = GetComponent<NetworkObject>();

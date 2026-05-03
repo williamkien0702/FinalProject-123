@@ -26,6 +26,11 @@ public class KingCoin : NetworkBehaviour
             movement.NotifyLocalKingCoin();
         }
 
+        if (player.IsOwner)
+        {
+            FineMarbleSfx.Instance?.PlayKingCoinPickup();
+        }
+
         GameManager gm = Object.FindFirstObjectByType<GameManager>();
         if (gm != null)
         {

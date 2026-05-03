@@ -31,11 +31,18 @@ public class BombTrap : NetworkBehaviour
             if (distance <= activationRadius)
             {
                 _activated = true;
+
                 PlayerMovement movement = player.GetComponent<PlayerMovement>();
                 if (movement != null)
                 {
                     movement.NotifyBombTriggered();
                 }
+
+                if (player.IsOwner)
+                {
+                    FineMarbleSfx.Instance?.PlayBombWarning();
+                }
+
                 StartCoroutine(ExplodeAfterDelay());
                 break;
             }
@@ -45,6 +52,8 @@ public class BombTrap : NetworkBehaviour
     private IEnumerator ExplodeAfterDelay()
     {
         yield return new WaitForSeconds(explosionDelay);
+
+        FineMarbleSfx.Instance?.PlayBombExplosion();
 
         PlayerNetwork[] players = FindObjectsByType<PlayerNetwork>(FindObjectsSortMode.None);
         for (int i = 0; i < players.Length; i++)
@@ -70,11 +79,22 @@ public class BombTrap : NetworkBehaviour
             if (playerMovement.HasShield())
             {
                 playerMovement.NotifyShieldBlockedDamage();
+
+                if (playerNetwork.IsOwner)
+                {
+                    FineMarbleSfx.Instance?.PlayShieldBlock();
+                }
+
                 continue;
             }
 
             playerNetwork.score.Value = Mathf.Max(0, playerNetwork.score.Value - pointPenalty);
             playerMovement.NotifyBombDamage(pointPenalty);
+
+            if (playerNetwork.IsOwner)
+            {
+                FineMarbleSfx.Instance?.PlayBombExplosion();
+            }
         }
 
         NetworkObject netObj = GetComponent<NetworkObject>();

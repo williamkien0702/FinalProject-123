@@ -37,6 +37,8 @@ public class LanConnectUI : MonoBehaviour
 
         if (GUI.Button(new Rect(panel.x + 40f, panel.y + 188f, 180f, 44f), "Start Host", SimpleUiTheme.Button))
         {
+            FineMarbleSfx.Instance?.PlayUiClick();
+
             UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
             if (transport != null)
             {
@@ -47,6 +49,8 @@ public class LanConnectUI : MonoBehaviour
 
         if (GUI.Button(new Rect(panel.x + panel.width - 220f, panel.y + 188f, 180f, 44f), "Start Client", SimpleUiTheme.Button))
         {
+            FineMarbleSfx.Instance?.PlayUiClick();
+
             UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
             if (transport != null)
             {
@@ -57,6 +61,7 @@ public class LanConnectUI : MonoBehaviour
 
         if (GUI.Button(new Rect(panel.x + (panel.width - 140f) * 0.5f, panel.y + 246f, 140f, 38f), "Exit Game", SimpleUiTheme.Button))
         {
+            FineMarbleSfx.Instance?.PlayUiClick();
             QuitGame();
         }
 
@@ -70,6 +75,7 @@ public class LanConnectUI : MonoBehaviour
     {
         if (GUI.Button(new Rect(Screen.width - 150f, 220f, 120f, 38f), "Exit Game", SimpleUiTheme.Button))
         {
+            FineMarbleSfx.Instance?.PlayUiClick();
             QuitGame();
         }
     }

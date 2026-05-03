@@ -6,6 +6,7 @@ public class EndGameUI : MonoBehaviour
 {
     private GameManager _gameManager;
     private readonly List<PlayerNetwork> _players = new List<PlayerNetwork>();
+    private bool _playedEndSound = false;
 
     private void Awake()
     {
@@ -16,7 +17,14 @@ public class EndGameUI : MonoBehaviour
     {
         if (!GameManager.gameOver)
         {
+            _playedEndSound = false;
             return;
+        }
+
+        if (!_playedEndSound)
+        {
+            FineMarbleSfx.Instance?.PlayRoundEnd();
+            _playedEndSound = true;
         }
 
         Rect panel = new Rect((Screen.width - 520f) * 0.5f, (Screen.height - 360f) * 0.5f, 520f, 360f);
@@ -43,6 +51,9 @@ public class EndGameUI : MonoBehaviour
 
         if (GUI.Button(new Rect(panel.x + 60f, panel.y + panel.height - 80f, 160f, 44f), "Play Again", SimpleUiTheme.Button))
         {
+            FineMarbleSfx.Instance?.PlayUiClick();
+            _playedEndSound = false;
+
             if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening && _gameManager != null)
             {
                 _gameManager.RestartGameServerRpc();
@@ -51,6 +62,7 @@ public class EndGameUI : MonoBehaviour
 
         if (GUI.Button(new Rect(panel.x + panel.width - 220f, panel.y + panel.height - 80f, 160f, 44f), "Exit Game", SimpleUiTheme.Button))
         {
+            FineMarbleSfx.Instance?.PlayUiClick();
             QuitGame();
         }
     }

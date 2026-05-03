@@ -24,6 +24,7 @@ public class PlayerNetwork : NetworkBehaviour
 
         if (IsOwner)
         {
+            FineMarbleSfx.Instance?.PlayCoinPickup();
             PlayCoinSfxLocal();
         }
 
