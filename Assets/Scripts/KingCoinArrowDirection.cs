@@ -3,45 +3,46 @@ using Unity.Netcode;
 
 public class KingCoinArrowUI : MonoBehaviour
 {
-    private void OnGUI()
+    void OnGUI()
     {
-        if (!GameManager.kingCoinActive || NetworkManager.Singleton == null || NetworkManager.Singleton.LocalClient == null)
-        {
-            return;
-        }
+        if (!GameManager.kingCoinActive) return;
+        if (NetworkManager.Singleton == null) return;
+        if (NetworkManager.Singleton.LocalClient == null) return;
+        if (NetworkManager.Singleton.LocalClient.PlayerObject == null) return;
 
-        NetworkObject playerObj = NetworkManager.Singleton.LocalClient.PlayerObject;
-        if (playerObj == null)
-        {
-            return;
-        }
+        Transform player = NetworkManager.Singleton.LocalClient.PlayerObject.transform;
 
-        Transform player = playerObj.transform;
+        // World-space direction from player to king coin
         Vector3 direction = GameManager.kingCoinPosition - player.position;
         direction.y = 0f;
-        if (direction.sqrMagnitude <= 0.001f)
-        {
-            return;
-        }
 
-        float angle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
-        float distance = direction.magnitude;
+        if (direction == Vector3.zero) return;
 
-        Rect panel = new Rect(Screen.width - 200f, 270f, 170f, 120f);
-        SimpleUiTheme.DrawPanel(panel, new Color(0.15f, 0.12f, 0.02f, 0.82f));
+        // World-space angle to the coin
+        float worldAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
 
-        GUIStyle arrowStyle = new GUIStyle(SimpleUiTheme.Title);
-        arrowStyle.fontSize = 72;
-        arrowStyle.normal.textColor = new Color(1f, 0.9f, 0.2f, 1f);
+        // Subtract the player's current facing (yaw) so the arrow is
+        // relative to where the player is looking, not world north
+        float playerYaw = player.eulerAngles.y;
+        float relativeAngle = worldAngle - playerYaw;
 
-        Rect arrowRect = new Rect(panel.x + 36f, panel.y + 8f, 96f, 80f);
-        GUIUtility.RotateAroundPivot(angle, arrowRect.center);
+        GUIStyle arrowStyle = new GUIStyle(GUI.skin.label);
+        arrowStyle.fontSize = 170;
+        arrowStyle.alignment = TextAnchor.MiddleCenter;
+        arrowStyle.normal.textColor = Color.yellow;
+        arrowStyle.fontStyle = FontStyle.Bold;
+
+        Rect arrowRect = new Rect(Screen.width - 250, 90, 220, 220);
+
+        GUIUtility.RotateAroundPivot(relativeAngle, arrowRect.center);
         GUI.Label(arrowRect, "↑", arrowStyle);
-        GUIUtility.RotateAroundPivot(-angle, arrowRect.center);
+        GUIUtility.RotateAroundPivot(-relativeAngle, arrowRect.center);
 
-        GUIStyle infoStyle = new GUIStyle(SimpleUiTheme.Small);
-        infoStyle.alignment = TextAnchor.MiddleCenter;
-        GUI.Label(new Rect(panel.x + 10f, panel.y + 78f, panel.width - 20f, 18f), "King Coin", infoStyle);
-        GUI.Label(new Rect(panel.x + 10f, panel.y + 96f, panel.width - 20f, 18f), distance.ToString("0.0") + " m", infoStyle);
+        GUIStyle textStyle = new GUIStyle(GUI.skin.label);
+        textStyle.fontSize = 22;
+        textStyle.alignment = TextAnchor.MiddleCenter;
+        textStyle.normal.textColor = Color.yellow;
+
+        GUI.Label(new Rect(Screen.width - 270, 240, 240, 40), "King Coin", textStyle);
     }
 }

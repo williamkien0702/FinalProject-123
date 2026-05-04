@@ -5,50 +5,36 @@ public class PlayerNetwork : NetworkBehaviour
 {
     public NetworkVariable<int> score = new NetworkVariable<int>(0);
 
-    [SerializeField] private AudioSource sfxSource;
+    [SerializeField] AudioSource sfxSource;
 
-    private void Awake()
+    void Awake()
     {
-        if (sfxSource == null)
-        {
-            sfxSource = GetComponent<AudioSource>();
-        }
+        if (sfxSource == null) sfxSource = GetComponent<AudioSource>();
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!other.CompareTag("Coin"))
-        {
-            return;
-        }
+        if (!other.CompareTag("Coin")) return;
 
         if (IsOwner)
         {
-            FineMarbleSfx.Instance?.PlayCoinPickup();
             PlayCoinSfxLocal();
         }
 
-        if (!IsServer)
-        {
-            return;
-        }
+        if (!IsServer) return;
 
-        NetworkObject coinNetObj = other.GetComponent<NetworkObject>();
+        var coinNetObj = other.GetComponent<NetworkObject>();
         if (coinNetObj != null && coinNetObj.IsSpawned)
         {
             score.Value += 1;
 
-            GameManager gm = Object.FindFirstObjectByType<GameManager>();
-            if (gm != null)
-            {
-                gm.CoinCollected();
-            }
+            Object.FindFirstObjectByType<GameManager>().CoinCollected();
 
             coinNetObj.Despawn(true);
         }
     }
 
-    private void PlayCoinSfxLocal()
+    void PlayCoinSfxLocal()
     {
         if (sfxSource != null && sfxSource.clip != null)
         {

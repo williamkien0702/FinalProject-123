@@ -7,29 +7,12 @@ public class KingCoin : NetworkBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!IsServer)
-        {
-            return;
-        }
+        if (!IsServer) return;
 
         PlayerNetwork player = other.GetComponent<PlayerNetwork>();
-        if (player == null)
-        {
-            return;
-        }
+        if (player == null) return;
 
         player.score.Value += pointValue;
-
-        PlayerMovement movement = other.GetComponent<PlayerMovement>();
-        if (movement != null)
-        {
-            movement.NotifyLocalKingCoin();
-        }
-
-        if (player.IsOwner)
-        {
-            FineMarbleSfx.Instance?.PlayKingCoinPickup();
-        }
 
         GameManager gm = Object.FindFirstObjectByType<GameManager>();
         if (gm != null)

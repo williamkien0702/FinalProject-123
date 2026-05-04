@@ -1,96 +1,72 @@
-using System.Collections.Generic;
 using UnityEngine;
 using Unity.Netcode;
 
 public class EndGameUI : MonoBehaviour
 {
-    private GameManager _gameManager;
-    private readonly List<PlayerNetwork> _players = new List<PlayerNetwork>();
-    private bool _playedEndSound = false;
+    private GameManager gameManager;
+    private bool cursorUnlocked = false;
 
-    private void Awake()
+    void Awake()
     {
-        _gameManager = Object.FindFirstObjectByType<GameManager>();
+        gameManager = Object.FindFirstObjectByType<GameManager>();
     }
 
-    private void OnGUI()
+    void Update()
     {
-        if (!GameManager.gameOver)
+        // Unlock the cursor as soon as the game ends so players can click buttons
+        if (GameManager.gameOver && !cursorUnlocked)
         {
-            _playedEndSound = false;
-            return;
+            TopDownFollowOwner.UnlockCursor();
+            cursorUnlocked = true;
         }
 
-        if (!_playedEndSound)
+        // Re-lock if game was restarted
+        if (!GameManager.gameOver && cursorUnlocked)
         {
-            FineMarbleSfx.Instance?.PlayRoundEnd();
-            _playedEndSound = true;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            cursorUnlocked = false;
         }
+    }
 
-        Rect panel = new Rect((Screen.width - 520f) * 0.5f, (Screen.height - 360f) * 0.5f, 520f, 360f);
-        SimpleUiTheme.DrawPanel(panel, new Color(0.03f, 0.05f, 0.08f, 0.94f));
+    void OnGUI()
+    {
+        if (!GameManager.gameOver) return;
 
-        GUI.Label(new Rect(panel.x + 20f, panel.y + 16f, panel.width - 40f, 42f), GameManager.winnerText, SimpleUiTheme.Warning);
-        GUI.Label(new Rect(panel.x + 20f, panel.y + 64f, panel.width - 40f, 24f), "FINAL STANDINGS", SimpleUiTheme.Body);
+        GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
+        labelStyle.fontSize = 40;
+        labelStyle.alignment = TextAnchor.MiddleCenter;
+        labelStyle.normal.textColor = Color.yellow;
 
-        CollectPlayers();
+        GUIStyle buttonStyle = new GUIStyle(GUI.skin.button);
+        buttonStyle.fontSize = 25;
 
-        float y = panel.y + 102f;
-        for (int i = 0; i < _players.Count; i++)
+        float boxWidth = 450;
+        float boxHeight = 240;
+        float x = (Screen.width - boxWidth) / 2;
+        float y = (Screen.height - boxHeight) / 2;
+
+        GUI.Box(new Rect(x, y, boxWidth, boxHeight), "");
+
+        GUI.Label(new Rect(x, y + 25, boxWidth, 60), GameManager.winnerText, labelStyle);
+
+        if (GUI.Button(new Rect(x + 60, y + 120, 140, 50), "Play Again", buttonStyle))
         {
-            PlayerNetwork pn = _players[i];
-            if (pn == null)
+            if (NetworkManager.Singleton != null &&
+                NetworkManager.Singleton.IsListening &&
+                gameManager != null)
             {
-                continue;
-            }
-
-            string text = (i + 1) + ". " + PlayerMovement.GetPlayerLabel(pn.OwnerClientId) + "  -  " + pn.score.Value;
-            GUI.Label(new Rect(panel.x + 30f, y, panel.width - 60f, 28f), text, SimpleUiTheme.Body);
-            y += 30f;
-        }
-
-        if (GUI.Button(new Rect(panel.x + 60f, panel.y + panel.height - 80f, 160f, 44f), "Play Again", SimpleUiTheme.Button))
-        {
-            FineMarbleSfx.Instance?.PlayUiClick();
-            _playedEndSound = false;
-
-            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening && _gameManager != null)
-            {
-                _gameManager.RestartGameServerRpc();
+                gameManager.RestartGameServerRpc();
             }
         }
 
-        if (GUI.Button(new Rect(panel.x + panel.width - 220f, panel.y + panel.height - 80f, 160f, 44f), "Exit Game", SimpleUiTheme.Button))
+        if (GUI.Button(new Rect(x + 250, y + 120, 140, 50), "Exit Game", buttonStyle))
         {
-            FineMarbleSfx.Instance?.PlayUiClick();
             QuitGame();
         }
     }
 
-    private void CollectPlayers()
-    {
-        _players.Clear();
-        PlayerNetwork[] all = FindObjectsByType<PlayerNetwork>(FindObjectsSortMode.None);
-        for (int i = 0; i < all.Length; i++)
-        {
-            if (all[i] != null && all[i].IsSpawned)
-            {
-                _players.Add(all[i]);
-            }
-        }
-
-        _players.Sort((a, b) =>
-        {
-            if (a == null && b == null) return 0;
-            if (a == null) return 1;
-            if (b == null) return -1;
-
-            int scoreCompare = b.score.Value.CompareTo(a.score.Value);
-            return scoreCompare != 0 ? scoreCompare : a.OwnerClientId.CompareTo(b.OwnerClientId);
-        });
-    }
-
-    private void QuitGame()
+    void QuitGame()
     {
         if (NetworkManager.Singleton != null)
         {
@@ -98,6 +74,7 @@ public class EndGameUI : MonoBehaviour
         }
 
         Application.Quit();
+
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #endif

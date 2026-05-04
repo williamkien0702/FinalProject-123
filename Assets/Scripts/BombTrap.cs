@@ -9,98 +9,91 @@ public class BombTrap : NetworkBehaviour
     public float explosionRadius = 5f;
     public int pointPenalty = 5;
 
-    private bool _activated;
+    [Header("VFX")]
+    public ParticleSystem explosionPS;     // Drag ExplosionPS child here in Inspector
 
-    private void Update()
+    [Header("SFX")]
+    public AudioSource explosionAudio;     // Drag the AudioSource on ExplosionPS here
+
+    private bool activated = false;
+
+    void Update()
     {
-        if (!IsServer || _activated)
-        {
-            return;
-        }
+        if (!IsServer) return;
+        if (activated) return;
 
-        PlayerNetwork[] players = FindObjectsByType<PlayerNetwork>(FindObjectsSortMode.None);
-        for (int i = 0; i < players.Length; i++)
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
-            PlayerNetwork player = players[i];
-            if (player == null || !player.IsSpawned)
-            {
-                continue;
-            }
+            if (client.PlayerObject == null) continue;
 
-            float distance = Vector3.Distance(transform.position, player.transform.position);
+            float distance = Vector3.Distance(transform.position, client.PlayerObject.transform.position);
+
             if (distance <= activationRadius)
             {
-                _activated = true;
-
-                PlayerMovement movement = player.GetComponent<PlayerMovement>();
-                if (movement != null)
-                {
-                    movement.NotifyBombTriggered();
-                }
-
-                if (player.IsOwner)
-                {
-                    FineMarbleSfx.Instance?.PlayBombWarning();
-                }
-
+                activated = true;
                 StartCoroutine(ExplodeAfterDelay());
                 break;
             }
         }
     }
 
-    private IEnumerator ExplodeAfterDelay()
+    IEnumerator ExplodeAfterDelay()
     {
         yield return new WaitForSeconds(explosionDelay);
 
-        FineMarbleSfx.Instance?.PlayBombExplosion();
-
-        PlayerNetwork[] players = FindObjectsByType<PlayerNetwork>(FindObjectsSortMode.None);
-        for (int i = 0; i < players.Length; i++)
+        // Deal damage on the server
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
-            PlayerNetwork playerNetwork = players[i];
-            if (playerNetwork == null || !playerNetwork.IsSpawned)
+            if (client.PlayerObject == null) continue;
+
+            float distance = Vector3.Distance(transform.position, client.PlayerObject.transform.position);
+
+            if (distance <= explosionRadius)
             {
-                continue;
-            }
+                PlayerNetwork playerNetwork = client.PlayerObject.GetComponent<PlayerNetwork>();
+                PlayerMovement playerMovement = client.PlayerObject.GetComponent<PlayerMovement>();
 
-            float distance = Vector3.Distance(transform.position, playerNetwork.transform.position);
-            if (distance > explosionRadius)
-            {
-                continue;
-            }
+                if (playerNetwork == null || playerMovement == null) continue;
 
-            PlayerMovement playerMovement = playerNetwork.GetComponent<PlayerMovement>();
-            if (playerMovement == null)
-            {
-                continue;
-            }
+                if (playerMovement.HasShield()) continue;
 
-            if (playerMovement.HasShield())
-            {
-                playerMovement.NotifyShieldBlockedDamage();
-
-                if (playerNetwork.IsOwner)
-                {
-                    FineMarbleSfx.Instance?.PlayShieldBlock();
-                }
-
-                continue;
-            }
-
-            playerNetwork.score.Value = Mathf.Max(0, playerNetwork.score.Value - pointPenalty);
-            playerMovement.NotifyBombDamage(pointPenalty);
-
-            if (playerNetwork.IsOwner)
-            {
-                FineMarbleSfx.Instance?.PlayBombExplosion();
+                playerNetwork.score.Value -= pointPenalty;
+                if (playerNetwork.score.Value < 0) playerNetwork.score.Value = 0;
             }
         }
 
+        // Tell all clients to play the explosion, then despawn
+        PlayExplosionClientRpc();
+
+        // Small delay so the explosion has one frame to start
+        // before the NetworkObject gets destroyed
+        yield return new WaitForSeconds(0.05f);
+
         NetworkObject netObj = GetComponent<NetworkObject>();
         if (netObj != null && netObj.IsSpawned)
-        {
             netObj.Despawn(true);
+    }
+
+    [ClientRpc]
+    void PlayExplosionClientRpc()
+    {
+        if (explosionPS != null) explosionPS.Play();
+
+        if (explosionAudio != null && explosionAudio.clip != null)
+        {
+            // Spawn a temporary GameObject at the explosion position to play
+            // the sound — it survives the bomb despawning and destroys itself
+            // once the clip finishes
+            GameObject tempAudio = new GameObject("ExplosionAudio_Temp");
+            tempAudio.transform.position = transform.position;
+
+            AudioSource tempSource = tempAudio.AddComponent<AudioSource>();
+            tempSource.clip = explosionAudio.clip;
+            tempSource.volume = explosionAudio.volume;
+            tempSource.spatialBlend = explosionAudio.spatialBlend;
+            tempSource.Play();
+
+            Destroy(tempAudio, explosionAudio.clip.length + 0.1f);
         }
     }
 }
