@@ -11,16 +11,33 @@ public class FakeCoinTrap : NetworkBehaviour
         if (!IsServer) return;
 
         PlayerMovement player = other.GetComponent<PlayerMovement>();
-
         if (player == null) return;
 
         player.ApplySlow(slowSpeed, slowDuration);
 
-        NetworkObject netObj = GetComponent<NetworkObject>();
-
-        if (netObj != null && netObj.IsSpawned)
+        // Play fake coin sound on the player who hit it
+        PlayerNetwork playerNetwork = other.GetComponent<PlayerNetwork>();
+        if (playerNetwork != null)
         {
-            netObj.Despawn(true);
+            NotifyFakeCoinClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams
+                {
+                    TargetClientIds = new[] { playerNetwork.OwnerClientId }
+                }
+            });
         }
+
+        NetworkObject netObj = GetComponent<NetworkObject>();
+        if (netObj != null && netObj.IsSpawned)
+            netObj.Despawn(true);
+    }
+
+    [ClientRpc]
+    void NotifyFakeCoinClientRpc(ClientRpcParams rpcParams = default)
+    {
+        var localPlayer = NetworkManager.Singleton.LocalClient?.PlayerObject;
+        if (localPlayer == null) return;
+        localPlayer.GetComponent<PlayerNetwork>()?.PlayFakeCoinSound();
     }
 }

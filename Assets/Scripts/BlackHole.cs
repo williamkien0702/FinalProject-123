@@ -4,14 +4,13 @@ using Unity.Netcode;
 public class BlackHoleTrap : NetworkBehaviour
 {
     public float triggerRadius = 2f;
+    public float teleportMinDistance = 20f;
+    public float teleportMaxDistance = 50f;
 
-    public float teleportMinDistance = 12f;
-    public float teleportMaxDistance = 28f;
-
-    public float arenaMinX = -30f;
-    public float arenaMaxX = 30f;
-    public float arenaMinZ = -30f;
-    public float arenaMaxZ = 30f;
+    public float arenaMinX = -46f;
+    public float arenaMaxX = 46f;
+    public float arenaMinZ = -46f;
+    public float arenaMaxZ = 46f;
 
     private bool used = false;
 
@@ -33,23 +32,20 @@ public class BlackHoleTrap : NetworkBehaviour
             {
                 used = true;
 
-                TeleportPlayer(client.PlayerObject.gameObject);
+                TeleportPlayer(client.PlayerObject);
 
                 NetworkObject netObj = GetComponent<NetworkObject>();
-
                 if (netObj != null && netObj.IsSpawned)
-                {
                     netObj.Despawn(true);
-                }
 
                 break;
             }
         }
     }
 
-    void TeleportPlayer(GameObject player)
+    void TeleportPlayer(NetworkObject playerNetObj)
     {
-        Vector3 oldPos = player.transform.position;
+        Vector3 oldPos = playerNetObj.transform.position;
         Vector3 newPos = oldPos;
 
         for (int i = 0; i < 20; i++)
@@ -64,18 +60,36 @@ public class BlackHoleTrap : NetworkBehaviour
             );
 
             Vector3 candidate = oldPos + direction * distance;
-
             candidate.x = Mathf.Clamp(candidate.x, arenaMinX, arenaMaxX);
             candidate.z = Mathf.Clamp(candidate.z, arenaMinZ, arenaMaxZ);
             candidate.y = oldPos.y;
 
-            if (Vector3.Distance(oldPos, candidate) >= teleportMinDistance)
+            // Make sure we don't teleport inside a wall
+            if (!Physics.CheckSphere(candidate, 1f, LayerMask.GetMask("Wall")) &&
+                Vector3.Distance(oldPos, candidate) >= teleportMinDistance)
             {
                 newPos = candidate;
                 break;
             }
         }
 
-        player.transform.position = newPos;
+        playerNetObj.transform.position = newPos;
+
+        // Tell the teleported player to play their teleport sound
+        NotifyTeleportClientRpc(new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { playerNetObj.OwnerClientId }
+            }
+        });
+    }
+
+    [ClientRpc]
+    void NotifyTeleportClientRpc(ClientRpcParams rpcParams = default)
+    {
+        var localPlayer = NetworkManager.Singleton.LocalClient?.PlayerObject;
+        if (localPlayer == null) return;
+        localPlayer.GetComponent<PlayerNetwork>()?.PlayTeleportSound();
     }
 }

@@ -25,6 +25,9 @@ public class Monster : NetworkBehaviour
     public float patrolRadius = 20f;        // How far from start it wanders
     public float waypointReachedDistance = 2f;
 
+    [Header("SFX")]
+    public AudioSource attackAudio;     // Drag AudioSource from monster prefab here
+
     [Header("Arena Bounds")]
     public float arenaMin = -46f;
     public float arenaMax = 46f;
@@ -163,6 +166,18 @@ public class Monster : NetworkBehaviour
             {
                 playerNetwork.score.Value -= scorePenalty;
                 if (playerNetwork.score.Value < 0) playerNetwork.score.Value = 0;
+
+                // Play attack sound on the monster for all clients
+                PlayAttackSoundClientRpc();
+
+                // Tell the hit player to play their hit sound
+                NotifyHitClientRpc(new ClientRpcParams
+                {
+                    Send = new ClientRpcSendParams
+                    {
+                        TargetClientIds = new[] { playerNetwork.OwnerClientId }
+                    }
+                });
             }
         }
     }
@@ -222,6 +237,23 @@ public class Monster : NetworkBehaviour
         isFleeing = true;
         fleeStartTime = Time.time;
         TransitionTo(State.Flee);
+    }
+
+    // ─── NETWORK CALLS ────────────────────────────────────────────────────
+
+    [ClientRpc]
+    void PlayAttackSoundClientRpc()
+    {
+        if (attackAudio != null && attackAudio.clip != null)
+            attackAudio.PlayOneShot(attackAudio.clip);
+    }
+
+    [ClientRpc]
+    void NotifyHitClientRpc(ClientRpcParams rpcParams = default)
+    {
+        var localPlayer = NetworkManager.Singleton.LocalClient?.PlayerObject;
+        if (localPlayer == null) return;
+        localPlayer.GetComponent<PlayerNetwork>()?.PlayHitSound();
     }
 
     // ─── HELPERS ──────────────────────────────────────────────────────────

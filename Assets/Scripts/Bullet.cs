@@ -31,7 +31,7 @@ public class Bullet : NetworkBehaviour
         if (!IsServer) return;
 
         // Hit a monster — make it flee
-        Monster monster = other.GetComponent<Monster>();
+        Monster monster = other.GetComponentInParent<Monster>();
         if (monster != null)
         {
             monster.OnHitByBullet(transform.forward);
@@ -40,19 +40,36 @@ public class Bullet : NetworkBehaviour
         }
 
         // Hit a player
-        PlayerNetwork playerNetwork = other.GetComponent<PlayerNetwork>();
+        PlayerNetwork playerNetwork = other.GetComponentInParent<PlayerNetwork>();
         if (playerNetwork == null) return;
 
         // Don't hit the player who fired it
         if (playerNetwork.OwnerClientId == ownerClientId) return;
 
-        PlayerMovement playerMovement = other.GetComponent<PlayerMovement>();
+        PlayerMovement playerMovement = other.GetComponentInParent<PlayerMovement>();
         if (playerMovement != null && playerMovement.HasShield()) return;
 
         playerNetwork.score.Value -= scorePenalty;
         if (playerNetwork.score.Value < 0) playerNetwork.score.Value = 0;
 
+        // Tell the hit player to play their hit sound
+        NotifyHitClientRpc(new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { playerNetwork.OwnerClientId }
+            }
+        });
+
         DespawnBullet();
+    }
+
+    [ClientRpc]
+    void NotifyHitClientRpc(ClientRpcParams rpcParams = default)
+    {
+        var localPlayer = NetworkManager.Singleton.LocalClient?.PlayerObject;
+        if (localPlayer == null) return;
+        localPlayer.GetComponent<PlayerNetwork>()?.PlayHitSound();
     }
 
     void DespawnBullet()

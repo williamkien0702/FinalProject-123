@@ -126,7 +126,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2911085458
+  GlobalObjectIdHash: 575659537
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -153,9 +153,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BlackHoleTrap
   ShowTopMostFoldoutHeaderGroup: 1
   triggerRadius: 2
-  teleportMinDistance: 12
-  teleportMaxDistance: 28
-  arenaMinX: -30
-  arenaMaxX: 30
-  arenaMinZ: -30
-  arenaMaxZ: 30
+  teleportMinDistance: 20
+  teleportMaxDistance: 50
+  arenaMinX: -46
+  arenaMaxX: 46
+  arenaMinZ: -46
+  arenaMaxZ: 46

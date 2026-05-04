@@ -37,7 +37,47 @@ public class GameManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
         StartGame();
+    }
+
+    void OnClientConnected(ulong clientId)
+    {
+        if (!IsServer) return;
+
+        // Wait one frame for the player object to be fully spawned
+        StartCoroutine(MovePlayerToSafeSpawn(clientId));
+    }
+
+    IEnumerator MovePlayerToSafeSpawn(ulong clientId)
+    {
+        yield return null;
+
+        if (!NetworkManager.Singleton.ConnectedClients.ContainsKey(clientId)) yield break;
+
+        var playerObj = NetworkManager.Singleton.ConnectedClients[clientId].PlayerObject;
+        if (playerObj == null) yield break;
+
+        Vector3 safePos = GetSafeSpawnPosition(1f);
+        playerObj.transform.position = safePos;
+    }
+
+    Vector3 GetSafeSpawnPosition(float yPosition)
+    {
+        for (int i = 0; i < 100; i++)
+        {
+            Vector3 candidate = new Vector3(
+                Random.Range(-46f, 46f),
+                yPosition,
+                Random.Range(-46f, 46f)
+            );
+
+            if (!Physics.CheckSphere(candidate, 1.5f, LayerMask.GetMask("Wall")))
+                return candidate;
+        }
+
+        // Fallback to center if no safe position found
+        return new Vector3(0f, yPosition, 0f);
     }
 
     void Update()
@@ -154,12 +194,22 @@ public class GameManager : NetworkBehaviour
         {
             Vector3 pos;
             bool valid;
+            int attempts = 0;
 
             do
             {
                 valid = true;
                 pos = new Vector3(Random.Range(-46, 46), yPosition, Random.Range(-46, 46));
 
+                // Reject if inside a wall
+                if (Physics.CheckSphere(pos, 1.5f, LayerMask.GetMask("Wall")))
+                {
+                    valid = false;
+                    attempts++;
+                    continue;
+                }
+
+                // Reject if too close to another spawned object
                 foreach (var p in positions)
                 {
                     if (Vector3.Distance(p, pos) < 1.5f)
@@ -169,7 +219,11 @@ public class GameManager : NetworkBehaviour
                     }
                 }
 
-            } while (!valid);
+                attempts++;
+
+            } while (!valid && attempts < 100);
+
+            if (!valid) continue; // Skip if no valid position found after 100 attempts
 
             positions.Add(pos);
 

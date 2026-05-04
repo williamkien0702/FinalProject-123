@@ -5,11 +5,17 @@ public class PlayerNetwork : NetworkBehaviour
 {
     public NetworkVariable<int> score = new NetworkVariable<int>(0);
 
-    [SerializeField] AudioSource sfxSource;
+    [Header("SFX")]
+    [SerializeField] AudioSource coinAudio;       // Existing coin sound
+    public AudioSource hitAudio;                  // Hit by ghost, bullet, or bomb
+    public AudioSource speedAudio;                // Speed pickup
+    public AudioSource shieldAudio;               // Shield pickup
+    public AudioSource fakeCoinAudio;             // Fake coin pickup
+    public AudioSource teleportAudio;             // Black hole teleport
 
     void Awake()
     {
-        if (sfxSource == null) sfxSource = GetComponent<AudioSource>();
+        if (coinAudio == null) coinAudio = GetComponent<AudioSource>();
     }
 
     private void OnTriggerEnter(Collider other)
@@ -17,9 +23,7 @@ public class PlayerNetwork : NetworkBehaviour
         if (!other.CompareTag("Coin")) return;
 
         if (IsOwner)
-        {
             PlayCoinSfxLocal();
-        }
 
         if (!IsServer) return;
 
@@ -27,20 +31,49 @@ public class PlayerNetwork : NetworkBehaviour
         if (coinNetObj != null && coinNetObj.IsSpawned)
         {
             score.Value += 1;
-
             Object.FindFirstObjectByType<GameManager>().CoinCollected();
-
             coinNetObj.Despawn(true);
         }
     }
 
     void PlayCoinSfxLocal()
     {
-        if (sfxSource != null && sfxSource.clip != null)
-        {
-            // PlayOneShot layers sounds on top of each other so rapid
-            // coin pickups don't cut off the previous sound
-            sfxSource.PlayOneShot(sfxSource.clip);
-        }
+        if (coinAudio != null && coinAudio.clip != null)
+            coinAudio.PlayOneShot(coinAudio.clip);
+    }
+
+    public void PlayHitSound()
+    {
+        if (!IsOwner) return;
+        if (hitAudio != null && hitAudio.clip != null)
+            hitAudio.PlayOneShot(hitAudio.clip);
+    }
+
+    public void PlaySpeedSound()
+    {
+        if (!IsOwner) return;
+        if (speedAudio != null && speedAudio.clip != null)
+            speedAudio.PlayOneShot(speedAudio.clip);
+    }
+
+    public void PlayShieldSound()
+    {
+        if (!IsOwner) return;
+        if (shieldAudio != null && shieldAudio.clip != null)
+            shieldAudio.PlayOneShot(shieldAudio.clip);
+    }
+
+    public void PlayFakeCoinSound()
+    {
+        if (!IsOwner) return;
+        if (fakeCoinAudio != null && fakeCoinAudio.clip != null)
+            fakeCoinAudio.PlayOneShot(fakeCoinAudio.clip);
+    }
+
+    public void PlayTeleportSound()
+    {
+        if (!IsOwner) return;
+        if (teleportAudio != null && teleportAudio.clip != null)
+            teleportAudio.PlayOneShot(teleportAudio.clip);
     }
 }
