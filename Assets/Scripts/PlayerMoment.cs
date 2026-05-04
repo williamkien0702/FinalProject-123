@@ -10,6 +10,7 @@ public class PlayerMovement : NetworkBehaviour
 
     private float currentSpeed;
     private bool canDash = true;
+    private bool isDashing = false;
     private bool hasShield = false;
 
     // Replicated from owner to server each tick
@@ -74,6 +75,7 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (!IsServer) return;
         if (GameManager.gameOver) return;
+        if (isDashing) return;  // Dash coroutine handles movement during dash
 
         // Move relative to the player's current facing direction (yaw)
         Vector3 forward = new Vector3(
@@ -94,20 +96,55 @@ public class PlayerMovement : NetworkBehaviour
     void DashServerRpc()
     {
         if (!canDash) return;
+        if (isDashing) return;
 
         StartCoroutine(DashCooldownRoutine());
 
-        // Dash in the direction the player is facing
         Vector3 forward = new Vector3(
             Mathf.Sin(currentYaw * Mathf.Deg2Rad), 0f,
             Mathf.Cos(currentYaw * Mathf.Deg2Rad));
 
-        // Use move input to pick dash direction; fall back to forward
         Vector3 right = new Vector3(forward.z, 0f, -forward.x);
         Vector3 dashDir = (forward * moveInput.y + right * moveInput.x).normalized;
         if (dashDir == Vector3.zero) dashDir = forward;
 
-        transform.position += dashDir * dashForce;
+        StartCoroutine(SmoothDashRoutine(dashDir));
+    }
+
+    IEnumerator SmoothDashRoutine(Vector3 dashDir)
+    {
+        isDashing = true;
+
+        Vector3 startPos = transform.position;
+        Vector3 targetPos = transform.position + dashDir * dashForce;
+
+        float elapsed = 0f;
+        float dashDuration = 0.18f;  // How long the dash takes in seconds
+
+        while (elapsed < dashDuration)
+        {
+            elapsed += Time.fixedDeltaTime;
+            float t = elapsed / dashDuration;
+
+            // Ease out — fast start, smooth stop
+            float eased = 1f - Mathf.Pow(1f - t, 3f);
+
+            Vector3 nextPos = Vector3.Lerp(startPos, targetPos, eased);
+
+            // Still respect wall collisions during the dash
+            if (!Physics.CheckSphere(nextPos, 0.4f, LayerMask.GetMask("Wall")))
+            {
+                transform.position = nextPos;
+            }
+            else
+            {
+                break; // Stop dash if we hit a wall
+            }
+
+            yield return new WaitForFixedUpdate();
+        }
+
+        isDashing = false;
     }
 
     IEnumerator DashCooldownRoutine()

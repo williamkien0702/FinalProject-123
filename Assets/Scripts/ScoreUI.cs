@@ -7,6 +7,9 @@ public class ScoreUI : MonoBehaviour
     {
         if (NetworkManager.Singleton == null) return;
 
+        // Hide all game UI until the network session has started
+        if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer) return;
+
         GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
         labelStyle.fontSize = 40;
         labelStyle.normal.textColor = Color.white;
@@ -21,7 +24,7 @@ public class ScoreUI : MonoBehaviour
 
         GUI.Label(
             new Rect((Screen.width - 300) / 2, 20, 300, 60),
-            $"Time: {minutes:00}:{seconds:00}",
+            $"{minutes:00}:{seconds:00}",
             timerStyle
         );
 
@@ -92,14 +95,14 @@ public class ScoreUI : MonoBehaviour
             if (localPlayer != null)
             {
                 if (localPlayer.IsSpeedBoosted())
-                {
                     GUILayout.Label("Speed Boost Active", labelStyle);
-                }
 
                 if (localPlayer.HasShield())
-                {
                     GUILayout.Label("Shield Active", labelStyle);
-                }
+
+                GunShooter gunShooter = NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<GunShooter>();
+                if (gunShooter != null && gunShooter.hasGun.Value)
+                    GUILayout.Label($"Gun: {gunShooter.ammo.Value} shots", labelStyle);
             }
         }
 
