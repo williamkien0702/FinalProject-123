@@ -4,90 +4,133 @@ using Unity.Netcode.Transports.UTP;
 
 public class LanConnectUI : MonoBehaviour
 {
-    public string hostIP = "127.0.0.1";
+    public string hostIP = "192.168.0.238";
     public ushort port = 7777;
 
-    private void OnGUI()
+    void OnGUI()
     {
-        if (NetworkManager.Singleton == null)
-        {
-            return;
-        }
+        if (NetworkManager.Singleton == null) return;
 
         if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer)
         {
-            DrawConnectScreen();
+            DrawMainMenu();
         }
         else
         {
-            DrawInGameButtons();
+            DrawInGameExitButton();
         }
     }
 
-    private void DrawConnectScreen()
+    void DrawMainMenu()
     {
-        Rect panel = new Rect((Screen.width - 520f) * 0.5f, (Screen.height - 330f) * 0.5f, 520f, 330f);
-        SimpleUiTheme.DrawPanel(panel, new Color(0.04f, 0.07f, 0.12f, 0.92f));
+        float boxWidth = 560f;
+        float boxHeight = 460f;
+        float boxX = (Screen.width - boxWidth) / 2f;
+        float boxY = (Screen.height - boxHeight) / 2f;
 
-        GUI.Label(new Rect(panel.x + 20f, panel.y + 18f, panel.width - 40f, 40f), "FINE MARBLE", SimpleUiTheme.Title);
-        GUI.Label(new Rect(panel.x + 20f, panel.y + 62f, panel.width - 40f, 24f), "LAN MULTIPLAYER ARENA", SimpleUiTheme.Body);
+        // Background box
+        GUI.Box(new Rect(boxX, boxY, boxWidth, boxHeight), "");
 
-        GUI.Label(new Rect(panel.x + 40f, panel.y + 105f, panel.width - 80f, 22f), "Host IP", SimpleUiTheme.Body);
-        hostIP = GUI.TextField(new Rect(panel.x + 40f, panel.y + 132f, panel.width - 80f, 34f), hostIP, SimpleUiTheme.TextField);
+        // --- TITLE ---
+        GUIStyle titleStyle = new GUIStyle(GUI.skin.label);
+        titleStyle.fontSize = 58;
+        titleStyle.fontStyle = FontStyle.Bold;
+        titleStyle.alignment = TextAnchor.MiddleCenter;
+        titleStyle.normal.textColor = new Color(1f, 0.85f, 0f); // Gold
 
-        if (GUI.Button(new Rect(panel.x + 40f, panel.y + 188f, 180f, 44f), "Start Host", SimpleUiTheme.Button))
+        GUI.Label(new Rect(boxX, boxY + 20f, boxWidth, 70f), "COIN RIOT", titleStyle);
+
+        // --- SUBTITLE ---
+        GUIStyle subtitleStyle = new GUIStyle(GUI.skin.label);
+        subtitleStyle.fontSize = 18;
+        subtitleStyle.fontStyle = FontStyle.Bold;
+        subtitleStyle.alignment = TextAnchor.MiddleCenter;
+        subtitleStyle.normal.textColor = new Color(0.7f, 0.9f, 1f); // Light blue
+
+        GUI.Label(new Rect(boxX, boxY + 90f, boxWidth, 30f), "LAN MULTIPLAYER ARENA", subtitleStyle);
+
+        // --- DIVIDER ---
+        GUI.Box(new Rect(boxX + 40f, boxY + 126f, boxWidth - 80f, 2f), "");
+
+        // --- DESCRIPTION ---
+        GUIStyle descStyle = new GUIStyle(GUI.skin.label);
+        descStyle.fontSize = 16;
+        descStyle.alignment = TextAnchor.MiddleCenter;
+        descStyle.normal.textColor = new Color(0.85f, 0.85f, 0.85f);
+        descStyle.wordWrap = true;
+
+        GUI.Label(
+            new Rect(boxX + 30f, boxY + 136f, boxWidth - 60f, 80f),
+            "Race to collect coins across a chaotic arena.\nDodge bombs, laser grids, and black holes.\nGrab power-ups to gain the edge.\nHighest score when the timer runs out wins!",
+            descStyle
+        );
+
+        // --- IP LABEL ---
+        GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
+        labelStyle.fontSize = 20;
+        labelStyle.alignment = TextAnchor.MiddleCenter;
+        labelStyle.normal.textColor = Color.white;
+
+        GUI.Label(new Rect(boxX, boxY + 228f, boxWidth, 30f), "Host IP Address", labelStyle);
+
+        // --- IP INPUT ---
+        GUIStyle textFieldStyle = new GUIStyle(GUI.skin.textField);
+        textFieldStyle.fontSize = 20;
+        textFieldStyle.alignment = TextAnchor.MiddleCenter;
+
+        hostIP = GUI.TextField(
+            new Rect(boxX + 110f, boxY + 264f, 340f, 36f),
+            hostIP,
+            textFieldStyle
+        );
+
+        // --- BUTTONS ---
+        GUIStyle buttonStyle = new GUIStyle(GUI.skin.button);
+        buttonStyle.fontSize = 22;
+        buttonStyle.fontStyle = FontStyle.Bold;
+
+        if (GUI.Button(new Rect(boxX + 50f, boxY + 320f, 160f, 50f), "Start Host", buttonStyle))
         {
-            FineMarbleSfx.Instance?.PlayUiClick();
-
-            UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-            if (transport != null)
-            {
-                transport.SetConnectionData("0.0.0.0", port, "0.0.0.0");
-            }
+            var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+            transport.SetConnectionData("0.0.0.0", port, "0.0.0.0");
             NetworkManager.Singleton.StartHost();
         }
 
-        if (GUI.Button(new Rect(panel.x + panel.width - 220f, panel.y + 188f, 180f, 44f), "Start Client", SimpleUiTheme.Button))
+        if (GUI.Button(new Rect(boxX + 350f, boxY + 320f, 160f, 50f), "Join Game", buttonStyle))
         {
-            FineMarbleSfx.Instance?.PlayUiClick();
-
-            UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-            if (transport != null)
-            {
-                transport.SetConnectionData(hostIP, port);
-            }
+            var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+            transport.SetConnectionData(hostIP, port);
             NetworkManager.Singleton.StartClient();
         }
 
-        if (GUI.Button(new Rect(panel.x + (panel.width - 140f) * 0.5f, panel.y + 246f, 140f, 38f), "Exit Game", SimpleUiTheme.Button))
+        GUIStyle exitStyle = new GUIStyle(GUI.skin.button);
+        exitStyle.fontSize = 18;
+        exitStyle.normal.textColor = new Color(1f, 0.4f, 0.4f);
+
+        if (GUI.Button(new Rect(boxX + 190f, boxY + 390f, 180f, 38f), "Exit Game", exitStyle))
         {
-            FineMarbleSfx.Instance?.PlayUiClick();
             QuitGame();
         }
-
-        GUI.Label(
-            new Rect(panel.x + 30f, panel.y + 286f, panel.width - 60f, 34f),
-            "Collect coins, dodge bombs, lasers, walls, and black holes. Highest score wins when the timer ends.",
-            SimpleUiTheme.Small);
     }
 
-    private void DrawInGameButtons()
+    void DrawInGameExitButton()
     {
-        if (GUI.Button(new Rect(Screen.width - 150f, 220f, 120f, 38f), "Exit Game", SimpleUiTheme.Button))
+        GUIStyle buttonStyle = new GUIStyle(GUI.skin.button);
+        buttonStyle.fontSize = 18;
+
+        if (GUI.Button(new Rect(Screen.width - 150f, 20f, 120f, 40f), "Exit Game", buttonStyle))
         {
-            FineMarbleSfx.Instance?.PlayUiClick();
             QuitGame();
         }
     }
 
-    private void QuitGame()
+    void QuitGame()
     {
         if (NetworkManager.Singleton != null)
-        {
             NetworkManager.Singleton.Shutdown();
-        }
 
         Application.Quit();
+
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #endif

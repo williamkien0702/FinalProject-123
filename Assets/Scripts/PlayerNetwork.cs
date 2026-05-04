@@ -50,9 +50,11 @@ public class PlayerNetwork : NetworkBehaviour
 
     private void PlayCoinSfxLocal()
     {
-        if (sfxSource != null)
+        if (sfxSource != null && sfxSource.clip != null)
         {
-            sfxSource.Play();
+            // PlayOneShot layers sounds on top of each other so rapid
+            // coin pickups don't cut off the previous sound
+            sfxSource.PlayOneShot(sfxSource.clip);
         }
     }
 }
