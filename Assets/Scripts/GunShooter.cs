@@ -62,7 +62,7 @@ public class GunShooter : NetworkBehaviour
         // Spawn bullet at barrel position facing player's forward direction
         Vector3 spawnPos = bulletSpawnPoint != null
             ? bulletSpawnPoint.position
-            : transform.position + transform.forward * 1f + Vector3.up * 1.2f;
+            : transform.position + transform.forward * 1f + Vector3.up * 0.5f;
 
         GameObject bulletObj = Instantiate(bulletPrefab, spawnPos, transform.rotation);
 

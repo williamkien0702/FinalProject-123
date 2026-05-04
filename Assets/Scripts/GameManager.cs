@@ -14,6 +14,7 @@ public class GameManager : NetworkBehaviour
     public GameObject wallPrefab;
     public GameObject blackHolePrefab;
     public GameObject gunPickupPrefab;
+    public GameObject monsterPrefab;
     public static bool gameOver = false;
     public static string winnerText = "";
 
@@ -73,6 +74,7 @@ public class GameManager : NetworkBehaviour
         SpawnObjects(shieldPowerUpPrefab, totalShieldPowerUps, 0.5f);
         SpawnObjects(gunPickupPrefab, totalGunPickups, 1.5f);
         SpawnObjects(blackHolePrefab, totalBlackHoles, 0.8f);
+        SpawnObjects(monsterPrefab, 2, 1f);
         StartCoroutine(SpawnKingCoinAfterDelay(5f));
 
         UpdateTimerClientRpc(timeRemaining);
@@ -305,7 +307,8 @@ public class GameManager : NetworkBehaviour
                 netObj.CompareTag("KingCoin") ||
                 netObj.CompareTag("Wall") ||
                 netObj.CompareTag("GunPickup") ||
-                netObj.CompareTag("Bullet"))
+                netObj.CompareTag("Bullet") ||
+                netObj.CompareTag("Monster"))
             {
                 netObj.Despawn(true);
             }

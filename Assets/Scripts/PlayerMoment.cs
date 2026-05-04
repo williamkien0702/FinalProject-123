@@ -75,20 +75,39 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (!IsServer) return;
         if (GameManager.gameOver) return;
-        if (isDashing) return;  // Dash coroutine handles movement during dash
+        if (isDashing) return;
 
-        // Move relative to the player's current facing direction (yaw)
         Vector3 forward = new Vector3(
             Mathf.Sin(currentYaw * Mathf.Deg2Rad), 0f,
             Mathf.Cos(currentYaw * Mathf.Deg2Rad));
         Vector3 right = new Vector3(forward.z, 0f, -forward.x);
 
         Vector3 move = (forward * moveInput.y + right * moveInput.x).normalized;
-        Vector3 nextPosition = transform.position + move * currentSpeed * Time.fixedDeltaTime;
+        Vector3 currentPos = transform.position;
 
-        if (!Physics.CheckSphere(nextPosition, 0.4f, LayerMask.GetMask("Wall")))
+        // Try full movement first
+        Vector3 fullMove = currentPos + move * currentSpeed * Time.fixedDeltaTime;
+        if (!Physics.CheckSphere(fullMove, 0.4f, LayerMask.GetMask("Wall")))
         {
-            transform.position = nextPosition;
+            transform.position = fullMove;
+            return;
+        }
+
+        // Try sliding along X axis only
+        Vector3 moveX = new Vector3(move.x, 0f, 0f) * currentSpeed * Time.fixedDeltaTime;
+        Vector3 nextX = currentPos + moveX;
+        if (!Physics.CheckSphere(nextX, 0.4f, LayerMask.GetMask("Wall")))
+        {
+            transform.position = nextX;
+            return;
+        }
+
+        // Try sliding along Z axis only
+        Vector3 moveZ = new Vector3(0f, 0f, move.z) * currentSpeed * Time.fixedDeltaTime;
+        Vector3 nextZ = currentPos + moveZ;
+        if (!Physics.CheckSphere(nextZ, 0.4f, LayerMask.GetMask("Wall")))
+        {
+            transform.position = nextZ;
         }
     }
 

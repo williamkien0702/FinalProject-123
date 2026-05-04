@@ -8,6 +8,7 @@ TagManager:
   - KingCoin
   - Bullet
   - GunPickup
+  - Monster
   layers:
   - Default
   - TransparentFX

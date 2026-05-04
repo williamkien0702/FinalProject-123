@@ -30,6 +30,16 @@ public class Bullet : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        // Hit a monster — make it flee
+        Monster monster = other.GetComponent<Monster>();
+        if (monster != null)
+        {
+            monster.OnHitByBullet(transform.forward);
+            DespawnBullet();
+            return;
+        }
+
+        // Hit a player
         PlayerNetwork playerNetwork = other.GetComponent<PlayerNetwork>();
         if (playerNetwork == null) return;
 

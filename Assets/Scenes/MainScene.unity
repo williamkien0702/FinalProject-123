@@ -919,6 +919,7 @@ MonoBehaviour:
   wallPrefab: {fileID: 8068559595955911804, guid: 0feca2e54dad23142a9c0671e71d0322, type: 3}
   blackHolePrefab: {fileID: 836340774387677203, guid: 3481768e3f59f694db347655a2a74198, type: 3}
   gunPickupPrefab: {fileID: 5911881463437796716, guid: daf5ea1c4be6944db8621b6e38093728, type: 3}
+  monsterPrefab: {fileID: 5111738855690312633, guid: 7210ad836c3754653aa2fbdc5484b4da, type: 3}
 --- !u!114 &958410612
 MonoBehaviour:
   m_ObjectHideFlags: 0
