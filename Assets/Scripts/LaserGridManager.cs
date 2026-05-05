@@ -24,6 +24,9 @@ public class LaserGridManager : NetworkBehaviour
     public static bool laserWarningActive = false;
     public static bool laserFiringActive = false;
 
+    [Header("SFX")]
+    public AudioSource laserWarningAudio;   // Drag AudioSource here in Inspector
+
     private List<LaserLine> activeLaserLines = new List<LaserLine>();
 
     public override void OnNetworkSpawn()
@@ -51,6 +54,10 @@ public class LaserGridManager : NetworkBehaviour
         laserWarningActive = true;
         laserFiringActive = false;
         UpdateLaserStatusClientRpc(true, false);
+
+        // Play warning sound on all clients
+        if (laserWarningAudio != null && laserWarningAudio.clip != null)
+            PlayWarningSoundClientRpc();
 
         SpawnLaserGrid();
         SetLasersDamaging(false);
@@ -129,6 +136,13 @@ public class LaserGridManager : NetworkBehaviour
         }
 
         activeLaserLines.Clear();
+    }
+
+    [ClientRpc]
+    void PlayWarningSoundClientRpc()
+    {
+        if (laserWarningAudio != null && laserWarningAudio.clip != null)
+            laserWarningAudio.PlayOneShot(laserWarningAudio.clip);
     }
 
     [ClientRpc]

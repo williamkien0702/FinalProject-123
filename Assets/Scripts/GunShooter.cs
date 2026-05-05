@@ -10,7 +10,8 @@ public class GunShooter : NetworkBehaviour
     public Transform bulletSpawnPoint;
 
     [Header("SFX")]
-    public AudioSource gunShotAudio;    // Drag the AudioSource here in Inspector
+    public AudioSource gunShotAudio;        // Drag the AudioSource here in Inspector
+    public AudioSource gunPickupAudio;      // Drag the AudioSource here in Inspector
 
     // Synced so ScoreUI can show ammo count on the owner's screen
     public NetworkVariable<int> ammo = new NetworkVariable<int>(0,
@@ -43,6 +44,22 @@ public class GunShooter : NetworkBehaviour
 
         ammo.Value = maxAmmo;
         hasGun.Value = true;
+
+        // Tell the owner to play the pickup sound
+        PlayPickupSoundClientRpc(new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { OwnerClientId }
+            }
+        });
+    }
+
+    [ClientRpc]
+    void PlayPickupSoundClientRpc(ClientRpcParams rpcParams = default)
+    {
+        if (gunPickupAudio != null && gunPickupAudio.clip != null)
+            gunPickupAudio.PlayOneShot(gunPickupAudio.clip);
     }
 
     void LoseGun()

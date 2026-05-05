@@ -44,7 +44,7 @@ public class ScoreUI : MonoBehaviour
 
             GUI.Label(
                 new Rect((Screen.width - 1000) / 2, 135, 1000, 140),
-                "LASER GRID WARNING!\nSTAND INSIDE A SQUARE!",
+                "LASER GRID WARNING!",
                 laserStyle
             );
         }
@@ -80,7 +80,7 @@ public class ScoreUI : MonoBehaviour
 
         if (GameManager.kingCoinActive)
         {
-            GUILayout.Label("King Coin is active!", labelStyle);
+            GUILayout.Label("King Coin spawned!", labelStyle);
         }
         else
         {

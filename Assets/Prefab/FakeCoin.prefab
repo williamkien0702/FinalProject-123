@@ -16,9 +16,10 @@ GameObject:
   - component: {fileID: 1425143272452526938}
   - component: {fileID: 6358155295519364279}
   - component: {fileID: 4781878155179222794}
+  - component: {fileID: 8119159529499244800}
   m_Layer: 0
   m_Name: FakeCoin
-  m_TagString: Coin
+  m_TagString: FakeCoin
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -151,7 +152,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2831408164
+  GlobalObjectIdHash: 3047211668
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -204,3 +205,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CoinSpin
   degreesPerSecond: 200
+--- !u!114 &8119159529499244800
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4059872211584999813}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8004de26407ae04b9c60c82d6fe2044, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FakeCoinTrap
+  ShowTopMostFoldoutHeaderGroup: 1
+  slowSpeed: 2
+  slowDuration: 2

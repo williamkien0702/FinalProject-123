@@ -61,7 +61,7 @@ public class LanConnectUI : MonoBehaviour
 
         GUI.Label(
             new Rect(boxX + 30f, boxY + 136f, boxWidth - 60f, 80f),
-            "Race to collect coins across a chaotic arena.\nDodge bombs, laser grids, and black holes.\nGrab power-ups to gain the edge.\nHighest score when the timer runs out wins!",
+            "Race to collect coins across a chaotic arena.\nDodge bombs, laser grids, and portals.\nGrab power-ups to gain the edge.\nHighest score when the timer runs out wins!",
             descStyle
         );
 

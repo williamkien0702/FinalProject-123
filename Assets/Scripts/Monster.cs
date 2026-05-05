@@ -32,7 +32,7 @@ public class Monster : NetworkBehaviour
     public float arenaMin = -46f;
     public float arenaMax = 46f;
 
-    private State currentState = State.Patrol;
+    public State currentState = State.Patrol;
     private Vector3 startPosition;
     private Vector3 patrolTarget;
     private Transform chaseTarget;
@@ -41,7 +41,8 @@ public class Monster : NetworkBehaviour
     private float lastAttackTime = 0f;
     private bool isFleeing = false;
     private float fleeStartTime = 0f;
-    private float fleeTimeout = 3f;  // Max seconds to spend fleeing before giving up
+    private float fleeTimeout = 3f;
+    [HideInInspector] public bool JustAttacked = false;  // Max seconds to spend fleeing before giving up
 
     public override void OnNetworkSpawn()
     {
@@ -166,6 +167,8 @@ public class Monster : NetworkBehaviour
             {
                 playerNetwork.score.Value -= scorePenalty;
                 if (playerNetwork.score.Value < 0) playerNetwork.score.Value = 0;
+
+                JustAttacked = true;
 
                 // Play attack sound on the monster for all clients
                 PlayAttackSoundClientRpc();

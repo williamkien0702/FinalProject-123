@@ -215,4 +215,6 @@ public class PlayerMovement : NetworkBehaviour
     public bool HasShield() => hasShield;
 
     public bool IsSpeedBoosted() => currentSpeed > baseSpeed;
+
+    public bool IsMoving() => moveInput.magnitude > 0.1f;
 }
