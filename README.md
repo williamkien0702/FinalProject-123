@@ -1,22 +1,20 @@
-Group Name
-Fine Marble
+Game Name:
+Coin Riot
 
 ## Members / Roles
 - Will (Chi Kien Phung) – Initial setup, networking, gameplay systems
 - Nathan Meza – Implementation, Game Design, VFX
 - Skyler Varney – Art, 3D Modeling
-- [Member 4 name] – [role]
 - Jingyi Chen – UI / Sound / Polish
-- [Member 5 name] – [role]
 
 ## Game Description
 
-Our project is a multiplayer arena style game that builds on a previous coin collecting project from class. Instead of just collecting coins, this version will include more interactive gameplay elements to make it feel more complete and less simple. Players will move around the map collecting coins to gain points while also dealing with enemies, hazards, and competition from other players.
+Our project is a multiplayer arena style game. This game will include interactive gameplay elements. Players will move around the map collecting coins to gain points while also dealing with enemies, hazards, and competition from other players.
 
 We plan to expand the gameplay by adding enemy behaviors, trap or penalty objects, and power-ups such as speed boosts or shields. This adds more decision making and makes the game more competitive and fun. Our goal is to keep the project manageable while still showing clear improvement in gameplay depth, polish, and overall quality.
 
-This project will incorporate elements from the class such as multiplayer networking, Unity gameplay scripting, sound effects, better graphics than basic placeholder objects, and possibly extra polish through shaders or more varied enemy behavior.
+This project incorporates elements from the class such as multiplayer networking, Unity gameplay scripting, sound effects, better graphics than basic placeholder objects, and shaders and more varied enemy behavior.
 
 ## Current Project Status
 
-This repository currently contains the initial Unity project skeleton for our final project. At this stage, the upload is meant to establish the basic structure, version control setup, and starting point for development. The project will be expanded and improved throughout the rest of the assignment.
+This repository currently contains most of the implementations we wanted to add to the game. At this stage, the game has polished 3D graphics, enemies controlled with states, character animations, random player models, powerups, hazards, ui, sounds, and visual effects. The game supports multiple players over LAN and the player with the most points wins. The project can be expanded in the future by providing better network connectivity, more game maps, and more game modes.
