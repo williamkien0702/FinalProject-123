@@ -7,6 +7,7 @@ public class PlayerMovement : NetworkBehaviour
     public float baseSpeed = 8f;            // Reduced from 20 — FPS games move slower
     public float dashForce = 6f;
     public float dashCooldown = 3f;
+    public float turnSpeed = 12f;
 
     private float currentSpeed;
     private bool canDash = true;
@@ -50,7 +51,7 @@ public class PlayerMovement : NetworkBehaviour
 
     /// <summary>
     /// Called by FollowOwner on the local client every LateUpdate with the
-    /// current mouse-look yaw so the server can rotate the player body.
+    /// current mouse-look yaw so movement and aiming stay camera-relative.
     /// </summary>
     public void SetYaw(float yaw)
     {
@@ -61,8 +62,6 @@ public class PlayerMovement : NetworkBehaviour
     void SetYawServerRpc(float yaw)
     {
         currentYaw = yaw;
-        // Rotate the visible player body to face the direction they are looking
-        transform.rotation = Quaternion.Euler(0f, currentYaw, 0f);
     }
 
     [ServerRpc]
@@ -77,13 +76,13 @@ public class PlayerMovement : NetworkBehaviour
         if (GameManager.gameOver) return;
         if (isDashing) return;
 
-        Vector3 forward = new Vector3(
-            Mathf.Sin(currentYaw * Mathf.Deg2Rad), 0f,
-            Mathf.Cos(currentYaw * Mathf.Deg2Rad));
+        Vector3 forward = GetAimForward();
         Vector3 right = new Vector3(forward.z, 0f, -forward.x);
 
         Vector3 move = (forward * moveInput.y + right * moveInput.x).normalized;
         Vector3 currentPos = transform.position;
+
+        FaceMovementDirection(move);
 
         // Try full movement first
         Vector3 fullMove = currentPos + move * currentSpeed * Time.fixedDeltaTime;
@@ -119,9 +118,7 @@ public class PlayerMovement : NetworkBehaviour
 
         StartCoroutine(DashCooldownRoutine());
 
-        Vector3 forward = new Vector3(
-            Mathf.Sin(currentYaw * Mathf.Deg2Rad), 0f,
-            Mathf.Cos(currentYaw * Mathf.Deg2Rad));
+        Vector3 forward = GetAimForward();
 
         Vector3 right = new Vector3(forward.z, 0f, -forward.x);
         Vector3 dashDir = (forward * moveInput.y + right * moveInput.x).normalized;
@@ -217,4 +214,31 @@ public class PlayerMovement : NetworkBehaviour
     public bool IsSpeedBoosted() => currentSpeed > baseSpeed;
 
     public bool IsMoving() => moveInput.magnitude > 0.1f;
+
+    public Quaternion GetAimRotation()
+    {
+        return Quaternion.Euler(0f, currentYaw, 0f);
+    }
+
+    Vector3 GetAimForward()
+    {
+        return GetYawDirection(currentYaw);
+    }
+
+    static Vector3 GetYawDirection(float yaw)
+    {
+        float yawRadians = yaw * Mathf.Deg2Rad;
+        return new Vector3(Mathf.Sin(yawRadians), 0f, Mathf.Cos(yawRadians));
+    }
+
+    void FaceMovementDirection(Vector3 move)
+    {
+        if (move.sqrMagnitude < 0.001f) return;
+
+        Quaternion targetRotation = Quaternion.LookRotation(move, Vector3.up);
+        transform.rotation = Quaternion.Slerp(
+            transform.rotation,
+            targetRotation,
+            turnSpeed * Time.fixedDeltaTime);
+    }
 }

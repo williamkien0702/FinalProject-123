@@ -165,8 +165,7 @@ public class Monster : NetworkBehaviour
 
             if (playerNetwork != null && playerMovement != null && !playerMovement.HasShield())
             {
-                playerNetwork.score.Value -= scorePenalty;
-                if (playerNetwork.score.Value < 0) playerNetwork.score.Value = 0;
+                playerNetwork.TakeDamage(scorePenalty);
 
                 JustAttacked = true;
 

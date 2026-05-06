@@ -76,12 +76,18 @@ public class GunShooter : NetworkBehaviour
 
         ammo.Value--;
 
-        // Spawn bullet at barrel position facing player's forward direction
+        Quaternion fireRotation = transform.rotation;
+        PlayerMovement movement = GetComponent<PlayerMovement>();
+        if (movement != null)
+            fireRotation = movement.GetAimRotation();
+        Vector3 fireForward = fireRotation * Vector3.forward;
+
+        // Spawn bullet at barrel position facing the camera/aim direction
         Vector3 spawnPos = bulletSpawnPoint != null
             ? bulletSpawnPoint.position
-            : transform.position + transform.forward * 1f + Vector3.up * 0.5f;
+            : transform.position + fireForward * 1f + Vector3.up * 0.5f;
 
-        GameObject bulletObj = Instantiate(bulletPrefab, spawnPos, transform.rotation);
+        GameObject bulletObj = Instantiate(bulletPrefab, spawnPos, fireRotation);
 
         Bullet bullet = bulletObj.GetComponent<Bullet>();
         if (bullet != null)

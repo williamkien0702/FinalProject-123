@@ -21,6 +21,10 @@ public class LaserGridManager : NetworkBehaviour
     public float laserHeight = 1.2f;
     public float laserThickness = 0.4f;
 
+    [Header("Warning Visual")]
+    public float warningPreviewDuration = 0.5f;
+    [Range(0f, 1f)] public float warningPreviewAlpha = 0.35f;
+
     public static bool laserWarningActive = false;
     public static bool laserFiringActive = false;
 
@@ -62,13 +66,20 @@ public class LaserGridManager : NetworkBehaviour
         SpawnLaserGrid();
         SetLasersDamaging(false);
 
-        yield return new WaitForSeconds(warningDuration);
+        SetLaserVisuals(true, warningPreviewAlpha);
+        float totalWarningDuration = Mathf.Max(0f, warningDuration);
+        float previewDuration = Mathf.Min(Mathf.Max(0f, warningPreviewDuration), totalWarningDuration);
+        yield return new WaitForSeconds(previewDuration);
+
+        SetLaserVisuals(false, warningPreviewAlpha);
+        yield return new WaitForSeconds(totalWarningDuration - previewDuration);
 
         // Firing phase — enable damage on all laser colliders
         laserWarningActive = false;
         laserFiringActive = true;
         UpdateLaserStatusClientRpc(false, true);
 
+        SetLaserVisuals(true, 1f);
         SetLasersDamaging(true);
 
         yield return new WaitForSeconds(laserDuration);
@@ -121,6 +132,15 @@ public class LaserGridManager : NetworkBehaviour
         {
             if (line != null)
                 line.canDamage = damaging;
+        }
+    }
+
+    void SetLaserVisuals(bool visible, float alpha)
+    {
+        foreach (LaserLine line in activeLaserLines)
+        {
+            if (line != null)
+                line.SetVisualClientRpc(visible, alpha);
         }
     }
 

@@ -15,6 +15,17 @@ public class GameManager : NetworkBehaviour
     public GameObject blackHolePrefab;
     public GameObject gunPickupPrefab;
     public GameObject monsterPrefab;
+
+    [Header("Decorative Grass")]
+    public GameObject[] grassPrefabs;
+    public int totalGrass = 300;
+    public float grassYPosition = 0.02f;
+    public Vector2 grassScaleRange = new Vector2(0.7f, 1.4f);
+    public float grassArenaHalfSize = 46f;
+    public float grassWallClearance = 1.25f;
+    public float grassPatchScale = 0.08f;
+    [Range(0f, 1f)] public float grassPatchiness = 0.35f;
+
     public static bool gameOver = false;
     public static string winnerText = "";
 
@@ -32,6 +43,9 @@ public class GameManager : NetworkBehaviour
     private int totalWalls = 50;
     private int totalBlackHoles = 6;
     private bool timerRunning = false;
+    private int currentGrassSeed = 0;
+    private GameObject grassRoot;
+    private Coroutine grassSpawnRoutine;
 
     public override void OnNetworkSpawn()
     {
@@ -47,6 +61,7 @@ public class GameManager : NetworkBehaviour
 
         // Wait one frame for the player object to be fully spawned
         StartCoroutine(MovePlayerToSafeSpawn(clientId));
+        StartCoroutine(SpawnGrassForClientAfterConnect(clientId));
     }
 
     IEnumerator MovePlayerToSafeSpawn(ulong clientId)
@@ -60,6 +75,22 @@ public class GameManager : NetworkBehaviour
 
         Vector3 safePos = GetSafeSpawnPosition(1f);
         playerObj.transform.position = safePos;
+    }
+
+    IEnumerator SpawnGrassForClientAfterConnect(ulong clientId)
+    {
+        yield return null;
+        yield return null;
+
+        if (!NetworkManager.Singleton.ConnectedClients.ContainsKey(clientId)) yield break;
+
+        SpawnDecorativeGrassClientRpc(currentGrassSeed, new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { clientId }
+            }
+        });
     }
 
     Vector3 GetSafeSpawnPosition(float yPosition)
@@ -106,6 +137,8 @@ public class GameManager : NetworkBehaviour
         kingCoinActive = false;
 
         SpawnWalls();
+        currentGrassSeed = Random.Range(0, int.MaxValue);
+        SpawnDecorativeGrassClientRpc(currentGrassSeed);
 
         SpawnObjects(coinPrefab, totalCoins, 0.5f);
         SpawnObjects(fakeCoinPrefab, totalFakeCoins, 0.5f);
@@ -232,6 +265,94 @@ public class GameManager : NetworkBehaviour
         }
     }
 
+    [ClientRpc]
+    void SpawnDecorativeGrassClientRpc(int seed, ClientRpcParams clientRpcParams = default)
+    {
+        ClearDecorativeGrass();
+        grassSpawnRoutine = StartCoroutine(SpawnDecorativeGrassAfterWalls(seed));
+    }
+
+    IEnumerator SpawnDecorativeGrassAfterWalls(int seed)
+    {
+        // Give networked walls a moment to appear on clients before checking collisions.
+        yield return null;
+        yield return null;
+
+        SpawnDecorativeGrass(seed);
+        grassSpawnRoutine = null;
+    }
+
+    void SpawnDecorativeGrass(int seed)
+    {
+        if (grassPrefabs == null || grassPrefabs.Length == 0) return;
+        if (totalGrass <= 0) return;
+
+        grassRoot = new GameObject("Generated Grass");
+
+        Random.State previousRandomState = Random.state;
+        Random.InitState(seed);
+
+        Vector2 noiseOffset = new Vector2(Random.Range(0f, 1000f), Random.Range(0f, 1000f));
+        float minimumPatchNoise = Mathf.Lerp(0f, 0.65f, grassPatchiness);
+        int wallLayerMask = LayerMask.GetMask("Wall");
+
+        int spawned = 0;
+        int attempts = 0;
+        int maxAttempts = totalGrass * 20;
+
+        while (spawned < totalGrass && attempts < maxAttempts)
+        {
+            attempts++;
+
+            GameObject prefab = grassPrefabs[Random.Range(0, grassPrefabs.Length)];
+            if (prefab == null) continue;
+
+            Vector3 pos = new Vector3(
+                Random.Range(-grassArenaHalfSize, grassArenaHalfSize),
+                grassYPosition,
+                Random.Range(-grassArenaHalfSize, grassArenaHalfSize));
+
+            float patchNoise = Mathf.PerlinNoise(
+                pos.x * grassPatchScale + noiseOffset.x,
+                pos.z * grassPatchScale + noiseOffset.y);
+
+            if (patchNoise < minimumPatchNoise) continue;
+
+            if (wallLayerMask != 0 &&
+                Physics.CheckSphere(pos + Vector3.up * 0.5f, grassWallClearance, wallLayerMask))
+            {
+                continue;
+            }
+
+            Quaternion rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+            GameObject grass = Instantiate(prefab, pos, rotation, grassRoot.transform);
+
+            float minScale = Mathf.Min(grassScaleRange.x, grassScaleRange.y);
+            float maxScale = Mathf.Max(grassScaleRange.x, grassScaleRange.y);
+            float scale = Random.Range(minScale, maxScale);
+            grass.transform.localScale = Vector3.Scale(grass.transform.localScale, new Vector3(scale, scale, scale));
+
+            spawned++;
+        }
+
+        Random.state = previousRandomState;
+    }
+
+    void ClearDecorativeGrass()
+    {
+        if (grassSpawnRoutine != null)
+        {
+            StopCoroutine(grassSpawnRoutine);
+            grassSpawnRoutine = null;
+        }
+
+        if (grassRoot != null)
+        {
+            Destroy(grassRoot);
+            grassRoot = null;
+        }
+    }
+
     IEnumerator SpawnKingCoinAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
@@ -247,7 +368,7 @@ public class GameManager : NetworkBehaviour
     {
         if (kingCoinPrefab == null) return;
 
-        Vector3 pos = new Vector3(Random.Range(-28, 28), 0.8f, Random.Range(-28, 28));
+        Vector3 pos = new Vector3(Random.Range(-28, 28), 1.5f, Random.Range(-28, 28));
 
         GameObject kingCoin = Instantiate(kingCoinPrefab, pos, Quaternion.identity);
         kingCoin.GetComponent<NetworkObject>().Spawn();
