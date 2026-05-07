@@ -55,8 +55,7 @@ public class BombTrap : NetworkBehaviour
                 if (playerNetwork == null || playerMovement == null) continue;
                 if (playerMovement.HasShield()) continue;
 
-                playerNetwork.score.Value -= pointPenalty;
-                if (playerNetwork.score.Value < 0) playerNetwork.score.Value = 0;
+                playerNetwork.TakeDamage(pointPenalty);
 
                 // Tell the hit player to play their hit sound
                 NotifyHitClientRpc(new ClientRpcParams

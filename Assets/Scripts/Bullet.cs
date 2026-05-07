@@ -49,8 +49,7 @@ public class Bullet : NetworkBehaviour
         PlayerMovement playerMovement = other.GetComponentInParent<PlayerMovement>();
         if (playerMovement != null && playerMovement.HasShield()) return;
 
-        playerNetwork.score.Value -= scorePenalty;
-        if (playerNetwork.score.Value < 0) playerNetwork.score.Value = 0;
+        playerNetwork.TakeDamage(scorePenalty);
 
         // Tell the hit player to play their hit sound
         NotifyHitClientRpc(new ClientRpcParams
