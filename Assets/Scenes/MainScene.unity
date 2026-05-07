@@ -185,7 +185,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 65f6150ebb7042c49937ee8e44773015, type: 2}
+  - {fileID: 2100000, guid: e99b1eb9cd4804971a73158fab7d551e, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -920,6 +920,15 @@ MonoBehaviour:
   blackHolePrefab: {fileID: 836340774387677203, guid: 3481768e3f59f694db347655a2a74198, type: 3}
   gunPickupPrefab: {fileID: 5911881463437796716, guid: daf5ea1c4be6944db8621b6e38093728, type: 3}
   monsterPrefab: {fileID: 5111738855690312633, guid: 7210ad836c3754653aa2fbdc5484b4da, type: 3}
+  grassPrefabs:
+  - {fileID: 78055027732946299, guid: 7c32fa023c14b4fdc855fd63bfdd9e47, type: 3}
+  totalGrass: 300
+  grassYPosition: 0.5
+  grassScaleRange: {x: 0.7, y: 1.4}
+  grassArenaHalfSize: 46
+  grassWallClearance: 1.25
+  grassPatchScale: 0.08
+  grassPatchiness: 0.35
 --- !u!114 &958410612
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1314,6 +1323,8 @@ MonoBehaviour:
   laserLineWidth: 0.1
   laserHeight: 1.2
   laserThickness: 0.4
+  warningPreviewDuration: 0.5
+  warningPreviewAlpha: 0.35
   laserWarningAudio: {fileID: 1396300751}
 --- !u!82 &1396300751
 AudioSource:

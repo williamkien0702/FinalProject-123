@@ -142,9 +142,9 @@ public class GameManager : NetworkBehaviour
 
         SpawnObjects(coinPrefab, totalCoins, 0.5f);
         SpawnObjects(fakeCoinPrefab, totalFakeCoins, 0.5f);
-        SpawnObjects(bombPrefab, totalBombs, 0.5f);
-        SpawnObjects(speedPowerUpPrefab, totalSpeedPowerUps, 0.5f);
-        SpawnObjects(shieldPowerUpPrefab, totalShieldPowerUps, 0.5f);
+        SpawnObjects(bombPrefab, totalBombs, 0.7f);
+        SpawnObjects(speedPowerUpPrefab, totalSpeedPowerUps, 1.5f);
+        SpawnObjects(shieldPowerUpPrefab, totalShieldPowerUps, 1.5f);
         SpawnObjects(gunPickupPrefab, totalGunPickups, 1.5f);
         SpawnObjects(blackHolePrefab, totalBlackHoles, 0.8f);
         SpawnObjects(monsterPrefab, 2, 1f);
@@ -260,7 +260,7 @@ public class GameManager : NetworkBehaviour
 
             positions.Add(pos);
 
-            GameObject obj = Instantiate(prefab, pos, Quaternion.identity);
+            GameObject obj = Instantiate(prefab, pos, prefab.transform.rotation);
             obj.GetComponent<NetworkObject>().Spawn();
         }
     }
