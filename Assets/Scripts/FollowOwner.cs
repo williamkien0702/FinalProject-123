@@ -5,10 +5,10 @@ public class TopDownFollowOwner : NetworkBehaviour
 {
     [Header("Third Person Settings")]
     public float mouseSensitivity = 2f;
-    public float cameraDistance = 5f;    // How far behind the player
-    public float cameraHeight = 2.5f;    // How high above the player
-    public float minPitch = -20f;        // Look down limit
-    public float maxPitch = 60f;         // Look up limit
+    public float cameraDistance = 5f;
+    public float cameraHeight = 2.5f;
+    public float minPitch = -20f;
+    public float maxPitch = 60f;
 
     private Camera cam;
     private float pitch = 15f;
@@ -21,9 +21,7 @@ public class TopDownFollowOwner : NetworkBehaviour
         cam = Camera.main;
         if (cam == null) return;
 
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
-
+        LockCursor();
         PositionCamera();
     }
 
@@ -31,13 +29,27 @@ public class TopDownFollowOwner : NetworkBehaviour
     {
         if (!IsOwner) return;
         if (cam == null) return;
-        if (GameManager.gameOver) return;
+
+        if (GameManager.gameOver)
+        {
+            UnlockCursor();
+            return;
+        }
+
+        // When pause menu is open, stop mouse-look and keep cursor visible.
+        if (GameManager.gamePaused)
+        {
+            UnlockCursor();
+            return;
+        }
+
+        LockCursor();
 
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
 
         yaw += mouseX;
-        pitch -= mouseY;  // Inverted fix: subtract so mouse up = look up
+        pitch -= mouseY;
         pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
 
         PlayerMovement movement = GetComponent<PlayerMovement>();
@@ -53,19 +65,15 @@ public class TopDownFollowOwner : NetworkBehaviour
     {
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
 
-        // Pull camera back and up, then raycast to prevent wall clipping
         Vector3 desiredOffset = rotation * new Vector3(0f, 0f, -cameraDistance);
         Vector3 targetPos = transform.position + Vector3.up * cameraHeight + desiredOffset;
 
-        // Raycast from player center to desired camera position — if anything
-        // is in the way, snap the camera in front of the obstruction
         Vector3 playerCenter = transform.position + Vector3.up * cameraHeight;
         Vector3 dir = targetPos - playerCenter;
         float dist = dir.magnitude;
 
         if (Physics.Raycast(playerCenter, dir.normalized, out RaycastHit hit, dist, LayerMask.GetMask("Wall")))
         {
-            // Pull camera just in front of the wall hit point
             cam.transform.position = hit.point + dir.normalized * 0.2f;
         }
         else
@@ -80,5 +88,14 @@ public class TopDownFollowOwner : NetworkBehaviour
     {
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+    }
+
+    public static void LockCursor()
+    {
+        if (GameManager.gameOver) return;
+        if (GameManager.gamePaused) return;
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 }

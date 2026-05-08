@@ -208,7 +208,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PowerUp
   ShowTopMostFoldoutHeaderGroup: 1
   powerUpType: 0
-  boostedSpeed: 35
+  boostedSpeed: 20
   duration: 5
 --- !u!114 &7470891748368932530
 MonoBehaviour:

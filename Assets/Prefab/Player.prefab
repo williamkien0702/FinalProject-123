@@ -179,7 +179,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1816192346
+  GlobalObjectIdHash: 2756929068
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -254,6 +254,7 @@ MonoBehaviour:
   baseSpeed: 8
   dashForce: 6
   dashCooldown: 3
+  turnSpeed: 12
 --- !u!114 &-1251016141772606861
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -275,6 +276,9 @@ MonoBehaviour:
   shieldAudio: {fileID: 3215581071131432361}
   fakeCoinAudio: {fileID: 9218777282065499688}
   teleportAudio: {fileID: -4324586260737723912}
+  damageFlashColor: {r: 1, g: 0, b: 0, a: 1}
+  damageFlashAmount: 0.75
+  damageFlashDuration: 0.2
 --- !u!54 &2045392848939957918
 Rigidbody:
   m_ObjectHideFlags: 0

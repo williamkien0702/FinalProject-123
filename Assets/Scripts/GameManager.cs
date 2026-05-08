@@ -26,22 +26,25 @@ public class GameManager : NetworkBehaviour
     public float grassPatchScale = 0.08f;
     [Range(0f, 1f)] public float grassPatchiness = 0.35f;
 
+
+    public static bool gamePaused = false;
     public static bool gameOver = false;
     public static string winnerText = "";
 
-    public static float timeRemaining = 90f;
+    public static float timeRemaining = 150f;
     public static Vector3 kingCoinPosition;
     public static bool kingCoinActive = false;
 
-    private int totalCoins = 80;
-    private int totalFakeCoins = 15;
-    private int totalBombs = 8;
+    private int totalCoins = 100;
+    private int totalFakeCoins = 20;
+    private int totalBombs = 20;
     private int totalSpeedPowerUps = 5;
     private int totalShieldPowerUps = 5;
-    private int totalGunPickups = 4;
+    private int totalGunPickups = 5;
 
     private int totalWalls = 50;
-    private int totalBlackHoles = 6;
+    private int totalBlackHoles = 10;
+
     private bool timerRunning = false;
     private int currentGrassSeed = 0;
     private GameObject grassRoot;
@@ -55,11 +58,19 @@ public class GameManager : NetworkBehaviour
         StartGame();
     }
 
+    public override void OnNetworkDespawn()
+    {
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+        }
+    }
+
     void OnClientConnected(ulong clientId)
     {
         if (!IsServer) return;
 
-        // Wait one frame for the player object to be fully spawned
+        // Wait briefly so the player's NetworkObject fully exists before moving it.
         StartCoroutine(MovePlayerToSafeSpawn(clientId));
         StartCoroutine(SpawnGrassForClientAfterConnect(clientId));
     }
@@ -107,7 +118,6 @@ public class GameManager : NetworkBehaviour
                 return candidate;
         }
 
-        // Fallback to center if no safe position found
         return new Vector3(0f, yPosition, 0f);
     }
 
@@ -116,6 +126,7 @@ public class GameManager : NetworkBehaviour
         if (!IsServer) return;
         if (!timerRunning) return;
         if (gameOver) return;
+        if (gamePaused) return;
 
         timeRemaining -= Time.deltaTime;
 
@@ -132,22 +143,32 @@ public class GameManager : NetworkBehaviour
     {
         gameOver = false;
         winnerText = "";
-        timeRemaining = 90f;
+        timeRemaining = 150f;
         timerRunning = true;
         kingCoinActive = false;
 
         SpawnWalls();
+
         currentGrassSeed = Random.Range(0, int.MaxValue);
         SpawnDecorativeGrassClientRpc(currentGrassSeed);
 
-        SpawnObjects(coinPrefab, totalCoins, 0.5f);
+        // Coins spawn first so bombs and black holes can use some coin positions as bait.
+        List<Vector3> coinPositions = SpawnObjectsAndReturnPositions(coinPrefab, totalCoins, 0.5f);
+
         SpawnObjects(fakeCoinPrefab, totalFakeCoins, 0.5f);
-        SpawnObjects(bombPrefab, totalBombs, 0.7f);
+
+        // Some bombs spawn near coins to create risky coin pickups.
+        SpawnBombsWithCoinBait(coinPositions);
+
         SpawnObjects(speedPowerUpPrefab, totalSpeedPowerUps, 1.5f);
         SpawnObjects(shieldPowerUpPrefab, totalShieldPowerUps, 1.5f);
         SpawnObjects(gunPickupPrefab, totalGunPickups, 1.5f);
-        SpawnObjects(blackHolePrefab, totalBlackHoles, 0.8f);
+
+        // Some black holes spawn directly on coins to create high-risk coin pickups.
+        SpawnBlackHolesWithCoinBait(coinPositions);
+
         SpawnObjects(monsterPrefab, 2, 1f);
+
         StartCoroutine(SpawnKingCoinAfterDelay(5f));
 
         UpdateTimerClientRpc(timeRemaining);
@@ -159,9 +180,9 @@ public class GameManager : NetworkBehaviour
 
         int spawned = 0;
         int attempts = 0;
-        int maxAttempts = 600;          // More attempts needed to fill larger area
+        int maxAttempts = 600;
 
-        float minWallDistance = 14f;    // Scaled up from 9 to keep walls from clumping
+        float minWallDistance = 14f;
 
         List<Vector3> wallPositions = new List<Vector3>();
 
@@ -170,7 +191,7 @@ public class GameManager : NetworkBehaviour
             attempts++;
 
             Vector3 pos = new Vector3(
-                Random.Range(-46f, 46f),    // ~100 unit arena, leaving 4u border
+                Random.Range(-46f, 46f),
                 1f,
                 Random.Range(-46f, 46f)
             );
@@ -190,7 +211,7 @@ public class GameManager : NetworkBehaviour
 
             bool horizontal = Random.value > 0.5f;
 
-            float randomWallLength = Random.Range(8f, 18f);  // Longer walls to fill space
+            float randomWallLength = Random.Range(8f, 18f);
             float wallThickness = 1f;
             float wallHeight = 34f;
 
@@ -198,12 +219,10 @@ public class GameManager : NetworkBehaviour
 
             if (horizontal)
             {
-                // Horizontal wall, long on X axis
                 scale = new Vector3(randomWallLength, wallHeight, wallThickness);
             }
             else
             {
-                // Vertical wall, long on Z axis
                 scale = new Vector3(wallThickness, wallHeight, randomWallLength);
             }
 
@@ -216,12 +235,16 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-
     void SpawnObjects(GameObject prefab, int amount, float yPosition)
     {
-        if (prefab == null) return;
+        SpawnObjectsAndReturnPositions(prefab, amount, yPosition);
+    }
 
-        List<Vector3> positions = new List<Vector3>();
+    List<Vector3> SpawnObjectsAndReturnPositions(GameObject prefab, int amount, float yPosition)
+    {
+        List<Vector3> spawnedPositions = new List<Vector3>();
+
+        if (prefab == null) return spawnedPositions;
 
         for (int i = 0; i < amount; i++)
         {
@@ -232,9 +255,14 @@ public class GameManager : NetworkBehaviour
             do
             {
                 valid = true;
-                pos = new Vector3(Random.Range(-46, 46), yPosition, Random.Range(-46, 46));
 
-                // Reject if inside a wall
+                pos = new Vector3(
+                    Random.Range(-46f, 46f),
+                    yPosition,
+                    Random.Range(-46f, 46f)
+                );
+
+                // Do not spawn inside walls.
                 if (Physics.CheckSphere(pos, 1.5f, LayerMask.GetMask("Wall")))
                 {
                     valid = false;
@@ -242,8 +270,8 @@ public class GameManager : NetworkBehaviour
                     continue;
                 }
 
-                // Reject if too close to another spawned object
-                foreach (var p in positions)
+                // Avoid clumping objects spawned by the same call.
+                foreach (var p in spawnedPositions)
                 {
                     if (Vector3.Distance(p, pos) < 1.5f)
                     {
@@ -256,13 +284,133 @@ public class GameManager : NetworkBehaviour
 
             } while (!valid && attempts < 100);
 
-            if (!valid) continue; // Skip if no valid position found after 100 attempts
+            if (!valid) continue;
 
-            positions.Add(pos);
-
-            GameObject obj = Instantiate(prefab, pos, prefab.transform.rotation);
-            obj.GetComponent<NetworkObject>().Spawn();
+            spawnedPositions.Add(pos);
+            SpawnSingleNetworkObject(prefab, pos);
         }
+
+        return spawnedPositions;
+    }
+
+    void SpawnBombsWithCoinBait(List<Vector3> coinPositions)
+    {
+        if (bombPrefab == null) return;
+
+        // Half of the bombs become "bait bombs" near coins.
+        // The rest still spawn randomly.
+        int baitBombs = Mathf.Min(totalBombs / 2, coinPositions.Count);
+        int randomBombs = totalBombs - baitBombs;
+
+        List<Vector3> usedCoinPositions = new List<Vector3>();
+
+        int spawned = 0;
+        int attempts = 0;
+        int maxAttempts = 100;
+
+        while (spawned < baitBombs && attempts < maxAttempts)
+        {
+            attempts++;
+
+            Vector3 coinPos = GetUnusedRandomCoinPosition(coinPositions, usedCoinPositions);
+
+            // Put bomb very close to the coin, but not directly on top of it.
+            Vector2 offset = Random.insideUnitCircle.normalized * Random.Range(1.2f, 2.2f);
+
+            Vector3 bombPos = new Vector3(
+                coinPos.x + offset.x,
+                0.7f,
+                coinPos.z + offset.y
+            );
+
+            bombPos.x = Mathf.Clamp(bombPos.x, -46f, 46f);
+            bombPos.z = Mathf.Clamp(bombPos.z, -46f, 46f);
+
+            if (Physics.CheckSphere(bombPos, 1.5f, LayerMask.GetMask("Wall")))
+                continue;
+
+            SpawnSingleNetworkObject(bombPrefab, bombPos);
+            spawned++;
+        }
+
+        SpawnObjects(bombPrefab, randomBombs, 0.7f);
+    }
+
+    void SpawnBlackHolesWithCoinBait(List<Vector3> coinPositions)
+    {
+        if (blackHolePrefab == null) return;
+
+        // Half of the black holes spawn directly on coin positions.
+        // This creates bait coins that will likely trigger teleport when collected.
+        int baitBlackHoles = Mathf.Min(totalBlackHoles / 2, coinPositions.Count);
+        int randomBlackHoles = totalBlackHoles - baitBlackHoles;
+
+        List<Vector3> usedCoinPositions = new List<Vector3>();
+
+        int spawned = 0;
+        int attempts = 0;
+        int maxAttempts = 100;
+
+        while (spawned < baitBlackHoles && attempts < maxAttempts)
+        {
+            attempts++;
+
+            Vector3 coinPos = GetUnusedRandomCoinPosition(coinPositions, usedCoinPositions);
+
+            Vector3 blackHolePos = new Vector3(
+                coinPos.x,
+                0.8f,
+                coinPos.z
+            );
+
+            if (Physics.CheckSphere(blackHolePos, 1.5f, LayerMask.GetMask("Wall")))
+                continue;
+
+            SpawnSingleNetworkObject(blackHolePrefab, blackHolePos);
+            spawned++;
+        }
+
+        SpawnObjects(blackHolePrefab, randomBlackHoles, 0.8f);
+    }
+
+    Vector3 GetUnusedRandomCoinPosition(List<Vector3> coinPositions, List<Vector3> usedCoinPositions)
+    {
+        if (coinPositions == null || coinPositions.Count == 0)
+            return new Vector3(Random.Range(-46f, 46f), 0.5f, Random.Range(-46f, 46f));
+
+        for (int i = 0; i < 30; i++)
+        {
+            Vector3 candidate = coinPositions[Random.Range(0, coinPositions.Count)];
+
+            bool alreadyUsed = false;
+
+            foreach (Vector3 usedPos in usedCoinPositions)
+            {
+                if (Vector3.Distance(candidate, usedPos) < 0.1f)
+                {
+                    alreadyUsed = true;
+                    break;
+                }
+            }
+
+            if (!alreadyUsed)
+            {
+                usedCoinPositions.Add(candidate);
+                return candidate;
+            }
+        }
+
+        Vector3 fallback = coinPositions[Random.Range(0, coinPositions.Count)];
+        usedCoinPositions.Add(fallback);
+        return fallback;
+    }
+
+    void SpawnSingleNetworkObject(GameObject prefab, Vector3 position)
+    {
+        if (prefab == null) return;
+
+        GameObject obj = Instantiate(prefab, position, prefab.transform.rotation);
+        obj.GetComponent<NetworkObject>().Spawn();
     }
 
     [ClientRpc]
@@ -310,11 +458,13 @@ public class GameManager : NetworkBehaviour
             Vector3 pos = new Vector3(
                 Random.Range(-grassArenaHalfSize, grassArenaHalfSize),
                 grassYPosition,
-                Random.Range(-grassArenaHalfSize, grassArenaHalfSize));
+                Random.Range(-grassArenaHalfSize, grassArenaHalfSize)
+            );
 
             float patchNoise = Mathf.PerlinNoise(
                 pos.x * grassPatchScale + noiseOffset.x,
-                pos.z * grassPatchScale + noiseOffset.y);
+                pos.z * grassPatchScale + noiseOffset.y
+            );
 
             if (patchNoise < minimumPatchNoise) continue;
 
@@ -330,7 +480,11 @@ public class GameManager : NetworkBehaviour
             float minScale = Mathf.Min(grassScaleRange.x, grassScaleRange.y);
             float maxScale = Mathf.Max(grassScaleRange.x, grassScaleRange.y);
             float scale = Random.Range(minScale, maxScale);
-            grass.transform.localScale = Vector3.Scale(grass.transform.localScale, new Vector3(scale, scale, scale));
+
+            grass.transform.localScale = Vector3.Scale(
+                grass.transform.localScale,
+                new Vector3(scale, scale, scale)
+            );
 
             spawned++;
         }
@@ -368,7 +522,11 @@ public class GameManager : NetworkBehaviour
     {
         if (kingCoinPrefab == null) return;
 
-        Vector3 pos = new Vector3(Random.Range(-28, 28), 1.5f, Random.Range(-28, 28));
+        Vector3 pos = new Vector3(
+            Random.Range(-28f, 28f),
+            1.5f,
+            Random.Range(-28f, 28f)
+        );
 
         GameObject kingCoin = Instantiate(kingCoinPrefab, pos, Quaternion.identity);
         kingCoin.GetComponent<NetworkObject>().Spawn();
@@ -393,8 +551,8 @@ public class GameManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        // Normal coins no longer end the game.
-        // The timer decides when the game ends.
+        // Normal coins do not end the game anymore.
+        // The timer controls the match ending.
     }
 
     void EndGame()
@@ -402,6 +560,8 @@ public class GameManager : NetworkBehaviour
         if (gameOver) return;
 
         gameOver = true;
+        gamePaused = false;
+
         timerRunning = false;
 
         int bestScore = -1;
@@ -498,7 +658,34 @@ public class GameManager : NetworkBehaviour
     {
         gameOver = false;
         winnerText = "";
-        timeRemaining = 90f;
+        timeRemaining = 150f;
         kingCoinActive = false;
     }
+
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+public void SetPauseServerRpc(bool paused)
+{
+    if (gameOver) return;
+
+    gamePaused = paused;
+    SetPauseClientRpc(paused);
+}
+
+    [ClientRpc]
+    void SetPauseClientRpc(bool paused)
+    {
+        gamePaused = paused;
+
+        Time.timeScale = paused ? 0f : 1f;
+
+        if (paused)
+        {
+            PauseMenuUI.UnlockCursor();
+        }
+        else
+        {
+            PauseMenuUI.LockCursor();
+        }
+    }
+
 }

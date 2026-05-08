@@ -952,6 +952,7 @@ GameObject:
   - component: {fileID: 1192897344}
   - component: {fileID: 1192897343}
   - component: {fileID: 1192897345}
+  - component: {fileID: 1192897346}
   m_Layer: 0
   m_Name: UI
   m_TagString: Untagged
@@ -998,6 +999,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e78f4b471470b2040b3a710a41e5ed0f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KingCoinArrowUI
+--- !u!114 &1192897346
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1192897342}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 51d9c030564e0724eb1cd86521641cf1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PauseMenuUI
 --- !u!1 &1308479746
 GameObject:
   m_ObjectHideFlags: 0

@@ -15,10 +15,7 @@ public class LanConnectUI : MonoBehaviour
         {
             DrawMainMenu();
         }
-        else
-        {
-            DrawInGameExitButton();
-        }
+
     }
 
     void DrawMainMenu()
@@ -108,17 +105,6 @@ public class LanConnectUI : MonoBehaviour
         exitStyle.normal.textColor = new Color(1f, 0.4f, 0.4f);
 
         if (GUI.Button(new Rect(boxX + 190f, boxY + 390f, 180f, 38f), "Exit Game", exitStyle))
-        {
-            QuitGame();
-        }
-    }
-
-    void DrawInGameExitButton()
-    {
-        GUIStyle buttonStyle = new GUIStyle(GUI.skin.button);
-        buttonStyle.fontSize = 18;
-
-        if (GUI.Button(new Rect(Screen.width - 150f, 20f, 120f, 40f), "Exit Game", buttonStyle))
         {
             QuitGame();
         }

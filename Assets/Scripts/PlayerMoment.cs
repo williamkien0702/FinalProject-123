@@ -26,6 +26,8 @@ public class PlayerMovement : NetworkBehaviour
     void Update()
     {
         if (!IsOwner) return;
+        if (GameManager.gamePaused) return;
+        
         if (GameManager.gameOver)
         {
             // Unlock cursor on game over so UI buttons are clickable

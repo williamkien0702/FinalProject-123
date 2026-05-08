@@ -422,9 +422,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BombTrap
   ShowTopMostFoldoutHeaderGroup: 1
-  activationRadius: 1.5
-  explosionDelay: 0.2
-  explosionRadius: 5
+  activationRadius: 2
+  explosionDelay: 0.5
+  explosionRadius: 4
   pointPenalty: 5
   explosionPS: {fileID: 1550831012482688219}
   explosionAudio: {fileID: 1071330577349466951}
@@ -1146,7 +1146,7 @@ ParticleSystem:
     sphericalDirectionAmount: 0
     randomPositionAmount: 0
     radius:
-      value: 0.1
+      value: 4
       mode: 0
       spread: 0
       speed:

@@ -21,9 +21,12 @@ public class KingCoinArrowUI : MonoBehaviour
         // World-space angle to the coin
         float worldAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
 
-        // Subtract the player's current facing (yaw) so the arrow is
-        // relative to where the player is looking, not world north
-        float playerYaw = player.eulerAngles.y;
+        // Use camera yaw since camera now stays fixed while player body
+        // rotates to face movement direction
+        float playerYaw = Camera.main != null
+            ? Camera.main.transform.eulerAngles.y
+            : player.eulerAngles.y;
+
         float relativeAngle = worldAngle - playerYaw;
 
         GUIStyle arrowStyle = new GUIStyle(GUI.skin.label);
